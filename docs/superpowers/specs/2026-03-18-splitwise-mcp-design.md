@@ -168,6 +168,8 @@ SPLITWISE_API_KEY=<your api key>
 
 ## Package
 
+Use the latest compatible versions of all dependencies at implementation time (check `npm view <pkg> version` before pinning).
+
 ```json
 {
   "name": "splitwise-mcp",
@@ -183,14 +185,14 @@ SPLITWISE_API_KEY=<your api key>
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1",
-    "dotenv": "^17.0.0"
+    "@modelcontextprotocol/sdk": "<latest at implementation time>",
+    "dotenv": "<latest at implementation time>"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "@vitest/coverage-v8": "^2.0.0",
-    "typescript": "^5.0.0",
-    "vitest": "^2.0.0"
+    "@types/node": "<latest at implementation time>",
+    "@vitest/coverage-v8": "<latest at implementation time>",
+    "typescript": "<latest at implementation time>",
+    "vitest": "<latest at implementation time>"
   }
 }
 ```
