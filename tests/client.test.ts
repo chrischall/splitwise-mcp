@@ -91,13 +91,9 @@ describe('SplitwiseClient', () => {
 
     const client = new SplitwiseClient();
     const promise = client.request('GET', '/get_current_user');
-    // Attach rejection handler early to prevent unhandled rejection warning
-    const caught = promise.catch((e) => e);
+    const assertion = expect(promise).rejects.toThrow('Rate limited by Splitwise API');
     await vi.advanceTimersByTimeAsync(2000);
-    const err = await caught;
-
-    expect(err).toBeInstanceOf(Error);
-    expect(err.message).toBe('Rate limited by Splitwise API');
+    await assertion;
     vi.useRealTimers();
   });
 
