@@ -137,7 +137,7 @@ export const toolDefinitions: Tool[] = [
   },
   {
     name: 'sw_delete_expense',
-    description: 'Soft-delete a Splitwise expense by id. Returns {success: true} on success. Note: restoring deleted expenses requires sw_undelete_expense (not yet implemented).',
+    description: 'Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore.',
     annotations: { destructiveHint: true },
     inputSchema: {
       type: 'object',
@@ -147,7 +147,17 @@ export const toolDefinitions: Tool[] = [
       required: ['id'],
     },
   },
-  // TODO: sw_undelete_expense — POST /undelete_expense/{id} — restore a soft-deleted expense
+  {
+    name: 'sw_undelete_expense',
+    description: 'Restore a soft-deleted Splitwise expense.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer', description: 'Expense ID to restore' },
+      },
+      required: ['id'],
+    },
+  },
 ];
 
 export async function handleTool(
@@ -185,6 +195,11 @@ export async function handleTool(
     case 'sw_delete_expense': {
       const { id } = args as { id: number };
       const data = await client.request('POST', `/delete_expense/${id}`);
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+    case 'sw_undelete_expense': {
+      const { id } = args as { id: number };
+      const data = await client.request('POST', `/undelete_expense/${id}`);
       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
     }
     default:

@@ -8,12 +8,13 @@ afterEach(() => vi.clearAllMocks());
 
 describe('toolDefinitions', () => {
   const names = toolDefinitions.map((t) => t.name);
-  it('has all 5 expense tools', () => {
+  it('has all 6 expense tools', () => {
     expect(names).toContain('sw_list_expenses');
     expect(names).toContain('sw_get_expense');
     expect(names).toContain('sw_create_expense');
     expect(names).toContain('sw_update_expense');
     expect(names).toContain('sw_delete_expense');
+    expect(names).toContain('sw_undelete_expense');
   });
 });
 
@@ -151,5 +152,18 @@ describe('sw_delete_expense', () => {
     const result = await handleTool('sw_delete_expense', { id: 42 }, mockClient);
     expect(mockClient.request).toHaveBeenCalledWith('POST', '/delete_expense/42');
     expect(result.content[0].text).toContain('true');
+  });
+});
+
+describe('sw_undelete_expense', () => {
+  it('is in toolDefinitions', () => {
+    expect(toolDefinitions.some((t) => t.name === 'sw_undelete_expense')).toBe(true);
+  });
+
+  it('calls POST /undelete_expense/42', async () => {
+    mockClient.request = vi.fn().mockResolvedValue({ success: true });
+    const result = await handleTool('sw_undelete_expense', { id: 42 }, mockClient);
+    expect(mockClient.request).toHaveBeenCalledWith('POST', '/undelete_expense/42');
+    expect(result.isError).toBeFalsy();
   });
 });

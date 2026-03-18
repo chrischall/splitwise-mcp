@@ -8,12 +8,14 @@ afterEach(() => vi.clearAllMocks());
 
 describe('groups toolDefinitions', () => {
   const names = toolDefinitions.map((t) => t.name);
-  it('has all 5 group tools', () => {
+  it('has all 7 group tools', () => {
     expect(names).toContain('sw_list_groups');
     expect(names).toContain('sw_get_group');
     expect(names).toContain('sw_create_group');
     expect(names).toContain('sw_add_user_to_group');
     expect(names).toContain('sw_remove_user_from_group');
+    expect(names).toContain('sw_delete_group');
+    expect(names).toContain('sw_undelete_group');
   });
 });
 
@@ -93,5 +95,35 @@ describe('sw_remove_user_from_group', () => {
       group_id: 10,
       user_id: 99,
     });
+  });
+});
+
+describe('sw_delete_group', () => {
+  it('is in toolDefinitions with destructiveHint', () => {
+    const tool = toolDefinitions.find((t) => t.name === 'sw_delete_group');
+    expect(tool).toBeDefined();
+    expect(tool?.annotations?.destructiveHint).toBe(true);
+  });
+
+  it('calls POST /delete_group/42', async () => {
+    mockClient.request = vi.fn().mockResolvedValue({ success: true });
+    const result = await handleTool('sw_delete_group', { id: 42 }, mockClient);
+    expect(mockClient.request).toHaveBeenCalledWith('POST', '/delete_group/42');
+    expect(result.isError).toBeFalsy();
+  });
+});
+
+describe('sw_undelete_group', () => {
+  it('is in toolDefinitions without destructiveHint', () => {
+    const tool = toolDefinitions.find((t) => t.name === 'sw_undelete_group');
+    expect(tool).toBeDefined();
+    expect(tool?.annotations?.destructiveHint).toBeFalsy();
+  });
+
+  it('calls POST /undelete_group/42', async () => {
+    mockClient.request = vi.fn().mockResolvedValue({ success: true });
+    const result = await handleTool('sw_undelete_group', { id: 42 }, mockClient);
+    expect(mockClient.request).toHaveBeenCalledWith('POST', '/undelete_group/42');
+    expect(result.isError).toBeFalsy();
   });
 });

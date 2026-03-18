@@ -64,8 +64,29 @@ export const toolDefinitions: Tool[] = [
       required: ['group_id', 'user_id'],
     },
   },
-  // TODO: sw_delete_group — POST /delete_group/{id} — soft-delete a group
-  // TODO: sw_undelete_group — POST /undelete_group/{id} — restore a soft-deleted group
+  {
+    name: 'sw_delete_group',
+    description: 'Soft-delete a Splitwise group.',
+    annotations: { destructiveHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer', description: 'Group ID to delete' },
+      },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'sw_undelete_group',
+    description: 'Restore a soft-deleted Splitwise group.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer', description: 'Group ID to restore' },
+      },
+      required: ['id'],
+    },
+  },
 ];
 
 export async function handleTool(
@@ -118,6 +139,16 @@ export async function handleTool(
     case 'sw_remove_user_from_group': {
       const { group_id, user_id } = args as { group_id: number; user_id: number };
       const data = await client.request('POST', '/remove_user_from_group', { group_id, user_id });
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+    case 'sw_delete_group': {
+      const { id } = args as { id: number };
+      const data = await client.request('POST', `/delete_group/${id}`);
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+    case 'sw_undelete_group': {
+      const { id } = args as { id: number };
+      const data = await client.request('POST', `/undelete_group/${id}`);
       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
     }
     default:

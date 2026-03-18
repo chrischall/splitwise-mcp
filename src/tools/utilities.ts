@@ -20,14 +20,47 @@ export const toolDefinitions: Tool[] = [
     annotations: { readOnlyHint: true },
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
-  // TODO: sw_get_comments — GET /get_comments?expense_id= — get comments on an expense
-  // TODO: sw_create_comment — POST /create_comment — add a comment to an expense (expense_id, content)
-  // TODO: sw_delete_comment — POST /delete_comment/{id} — delete a comment
+  {
+    name: 'sw_get_comments',
+    description: 'Get all comments on a Splitwise expense.',
+    annotations: { readOnlyHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        expense_id: { type: 'integer', description: 'Expense ID to get comments for' },
+      },
+      required: ['expense_id'],
+    },
+  },
+  {
+    name: 'sw_create_comment',
+    description: 'Add a comment to a Splitwise expense.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        expense_id: { type: 'integer', description: 'Expense ID to comment on' },
+        content: { type: 'string', description: 'Comment text' },
+      },
+      required: ['expense_id', 'content'],
+    },
+  },
+  {
+    name: 'sw_delete_comment',
+    description: 'Delete a comment by id.',
+    annotations: { destructiveHint: true },
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: { type: 'integer', description: 'Comment ID to delete' },
+      },
+      required: ['id'],
+    },
+  },
 ];
 
 export async function handleTool(
   name: string,
-  _args: Record<string, unknown>,
+  args: Record<string, unknown>,
   client: SplitwiseClient
 ): Promise<CallToolResult> {
   switch (name) {
@@ -41,6 +74,21 @@ export async function handleTool(
     }
     case 'sw_get_currencies': {
       const data = await client.request('GET', '/get_currencies');
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+    case 'sw_get_comments': {
+      const { expense_id } = args as { expense_id: number };
+      const data = await client.request('GET', `/get_comments?expense_id=${expense_id}`);
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+    case 'sw_create_comment': {
+      const { expense_id, content } = args as { expense_id: number; content: string };
+      const data = await client.request('POST', '/create_comment', { expense_id, content });
+      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+    }
+    case 'sw_delete_comment': {
+      const { id } = args as { id: number };
+      const data = await client.request('POST', `/delete_comment/${id}`);
       return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
     }
     default:
