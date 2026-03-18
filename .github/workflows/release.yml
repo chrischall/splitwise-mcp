@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+
+      - name: Package skill
+        run: |
+          python3 - <<'PYEOF'
+          import zipfile, pathlib
+
+          skill_name = "splitwise-mcp"
+          out = pathlib.Path(f"{skill_name}.skill")
+
+          with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+              zf.write(pathlib.Path("SKILL.md"), f"{skill_name}/SKILL.md")
+
+          print(f"Packaged {out} ({out.stat().st_size} bytes)")
+          PYEOF
+
+      - name: Setup npm registry
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Publish to npm
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.RELEASE_PAT }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: splitwise-mcp.skill
+          generate_release_notes: true
