@@ -1,13 +1,15 @@
 {
   "name": "splitwise-mcp",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Splitwise MCP server for Claude — developed and maintained by AI (Claude Sonnet 4.6)",
   "author": "Claude Sonnet 4.6 (AI) <https://www.anthropic.com/claude>",
   "type": "module",
   "bin": {
     "splitwise-mcp": "dist/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "node dist/index.js",
