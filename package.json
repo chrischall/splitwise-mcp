@@ -3,6 +3,10 @@
   "version": "1.0.2",
   "description": "Splitwise MCP server for Claude — developed and maintained by AI (Claude Sonnet 4.6)",
   "author": "Claude Sonnet 4.6 (AI) <https://www.anthropic.com/claude>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chrischall/splitwise-mcp"
+  },
   "type": "module",
   "bin": {
     "splitwise-mcp": "dist/index.js"
