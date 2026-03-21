@@ -1,0 +1,41 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "splitwise-mcp",
+  "owner": {
+    "name": "Chris Hall",
+    "email": "chris.c.hall@gmail.com"
+  },
+  "metadata": {
+    "description": "MCP server for Splitwise — natural-language expense and group management via the Splitwise API",
+    "version": "1.1.0"
+  },
+  "plugins": [
+    {
+      "name": "splitwise-mcp",
+      "source": {
+        "source": "npm",
+        "package": "splitwise-mcp",
+        "version": "1.1.0"
+      },
+      "description": "MCP server for Splitwise — manage expenses, groups, and friends via natural language",
+      "version": "1.1.0",
+      "author": {
+        "name": "Chris Hall"
+      },
+      "homepage": "https://github.com/chrischall/splitwise-mcp",
+      "repository": "https://github.com/chrischall/splitwise-mcp",
+      "license": "MIT",
+      "keywords": ["splitwise", "expenses", "mcp", "finance"],
+      "category": "finance",
+      "mcpServers": {
+        "splitwise": {
+          "command": "npx",
+          "args": ["splitwise-mcp"],
+          "env": {
+            "SPLITWISE_API_KEY": "${SPLITWISE_API_KEY}"
+          }
+        }
+      }
+    }
+  ]
+}

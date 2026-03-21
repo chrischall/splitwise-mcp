@@ -1,0 +1,23 @@
+{
+  "name": "splitwise-mcp",
+  "version": "1.1.0",
+  "description": "MCP server for Splitwise — natural-language expense and group management via the Splitwise API",
+  "author": {
+    "name": "Chris Hall",
+    "email": "chris.c.hall@gmail.com"
+  },
+  "homepage": "https://github.com/chrischall/splitwise-mcp",
+  "repository": "https://github.com/chrischall/splitwise-mcp",
+  "license": "MIT",
+  "keywords": ["splitwise", "expenses", "mcp", "finance"],
+  "skills": "./SKILL.md",
+  "mcpServers": {
+    "splitwise": {
+      "command": "npx",
+      "args": ["splitwise-mcp"],
+      "env": {
+        "SPLITWISE_API_KEY": "${SPLITWISE_API_KEY}"
+      }
+    }
+  }
+}

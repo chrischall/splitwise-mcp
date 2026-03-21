@@ -32,7 +32,7 @@ for (const tool of expenseTools) handlers[tool.name] = (n, a) => handleExpenses(
 for (const tool of utilityTools) handlers[tool.name] = (n, a) => handleUtilities(n, a, client);
 
 const server = new Server(
-  { name: 'splitwise-mcp', version: '1.0.0' },
+  { name: 'splitwise-mcp', version: '1.1.0' },
   { capabilities: { tools: {} } }
 );
 

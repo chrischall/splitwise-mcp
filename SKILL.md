@@ -7,11 +7,38 @@ description: Access Splitwise expense and group data via MCP. Use when the user 
 
 MCP server for Splitwise — natural-language expense and group management via the Splitwise API.
 
+- **npm:** [npmjs.com/package/splitwise-mcp](https://www.npmjs.com/package/splitwise-mcp)
 - **Source:** [github.com/chrischall/splitwise-mcp](https://github.com/chrischall/splitwise-mcp)
 
 ## Setup
 
-Add to `.mcp.json` in your project:
+### Option A — npx (recommended)
+
+Add to `.mcp.json` in your project or `~/.claude/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "splitwise": {
+      "command": "npx",
+      "args": ["-y", "splitwise-mcp"],
+      "env": {
+        "SPLITWISE_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+### Option B — from source
+
+```bash
+git clone https://github.com/chrischall/splitwise-mcp
+cd splitwise-mcp
+npm install && npm run build
+```
+
+Then add to `.mcp.json`:
 
 ```json
 {
