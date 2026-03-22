@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "splitwise": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/index.js"],
+      "env": {
+        "SPLITWISE_API_KEY": "${SPLITWISE_API_KEY}"
+      }
+    }
+  }
+}
