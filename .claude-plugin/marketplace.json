@@ -7,7 +7,7 @@
   },
   "metadata": {
     "description": "MCP server for Splitwise — natural-language expense and group management via the Splitwise API",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "plugins": [
     {
@@ -15,7 +15,7 @@
       "displayName": "Splitwise",
       "source": "./",
       "description": "MCP server for Splitwise — manage expenses, groups, and friends via natural language",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "author": {
         "name": "Chris Hall"
       },
