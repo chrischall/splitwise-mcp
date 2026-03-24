@@ -12,10 +12,14 @@
     "splitwise-mcp": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    ".claude-plugin",
+    "SKILL.md",
+    ".mcp.json"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run bundle",
+    "bundle": "esbuild src/index.ts --bundle --platform=node --format=esm --external:dotenv --outfile=dist/bundle.js",
     "dev": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -28,6 +32,7 @@
   "devDependencies": {
     "@types/node": "^24.12.0",
     "@vitest/coverage-v8": "^4.1.0",
+    "esbuild": "^0.27.4",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0"
   }

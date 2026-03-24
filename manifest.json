@@ -1,0 +1,74 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/dxt/main/dist/mcpb-manifest.schema.json",
+  "manifest_version": "0.3",
+  "name": "splitwise-mcp",
+  "display_name": "Splitwise",
+  "version": "1.2.0",
+  "description": "Splitwise expense and group management for Claude — track shared expenses, settle up, and manage friends via natural language",
+  "author": {
+    "name": "Chris Chall",
+    "email": "chris.c.hall@gmail.com",
+    "url": "https://github.com/chrischall"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chrischall/splitwise-mcp"
+  },
+  "homepage": "https://github.com/chrischall/splitwise-mcp",
+  "support": "https://github.com/chrischall/splitwise-mcp/issues",
+  "license": "MIT",
+  "keywords": ["splitwise", "expenses", "finance", "groups", "friends"],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/bundle.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/bundle.js"],
+      "env": {
+        "SPLITWISE_API_KEY": "${user_config.splitwise_api_key}"
+      }
+    }
+  },
+  "user_config": {
+    "splitwise_api_key": {
+      "type": "string",
+      "title": "Splitwise API Key",
+      "description": "Your Splitwise API key (found at splitwise.com/apps/api)",
+      "required": true,
+      "sensitive": true
+    }
+  },
+  "tools": [
+    { "name": "sw_get_current_user", "description": "Get the current authenticated user" },
+    { "name": "sw_get_user", "description": "Get a user by ID" },
+    { "name": "sw_update_user", "description": "Update user details" },
+    { "name": "sw_list_groups", "description": "List all groups" },
+    { "name": "sw_get_group", "description": "Get a group by ID" },
+    { "name": "sw_create_group", "description": "Create a new group" },
+    { "name": "sw_delete_group", "description": "Delete a group" },
+    { "name": "sw_undelete_group", "description": "Restore a deleted group" },
+    { "name": "sw_add_user_to_group", "description": "Add a user to a group" },
+    { "name": "sw_remove_user_from_group", "description": "Remove a user from a group" },
+    { "name": "sw_list_friends", "description": "List all friends" },
+    { "name": "sw_create_friend", "description": "Add a friend" },
+    { "name": "sw_delete_friend", "description": "Remove a friend" },
+    { "name": "sw_list_expenses", "description": "List expenses with optional filters" },
+    { "name": "sw_get_expense", "description": "Get an expense by ID" },
+    { "name": "sw_create_expense", "description": "Create a new expense" },
+    { "name": "sw_update_expense", "description": "Update an expense" },
+    { "name": "sw_delete_expense", "description": "Delete an expense" },
+    { "name": "sw_undelete_expense", "description": "Restore a deleted expense" },
+    { "name": "sw_get_comments", "description": "Get comments on an expense" },
+    { "name": "sw_create_comment", "description": "Add a comment to an expense" },
+    { "name": "sw_delete_comment", "description": "Delete a comment" },
+    { "name": "sw_get_notifications", "description": "Get activity notifications" },
+    { "name": "sw_get_currencies", "description": "List supported currencies" },
+    { "name": "sw_get_categories", "description": "List expense categories" }
+  ],
+  "compatibility": {
+    "platforms": ["darwin", "win32"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

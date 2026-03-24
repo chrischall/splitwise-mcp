@@ -41,6 +41,18 @@ jobs:
           print(f"Packaged {out} ({out.stat().st_size} bytes)")
           PYEOF
 
+      # Sync manifest.json version from package.json and build .mcpb
+      - name: Build .mcpb bundle
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node -e "
+            const fs = require('fs');
+            const m = JSON.parse(fs.readFileSync('manifest.json', 'utf8'));
+            m.version = '$VERSION';
+            fs.writeFileSync('manifest.json', JSON.stringify(m, null, 2) + '\n');
+          "
+          npx @anthropic-ai/mcpb pack
+
       - name: Setup npm registry
         uses: actions/setup-node@v4.4.0
         with:
@@ -55,5 +67,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: splitwise-mcp.skill
+          files: |
+            splitwise-mcp.skill
+            splitwise-mcp.mcpb
           generate_release_notes: true
