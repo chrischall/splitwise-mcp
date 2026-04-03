@@ -27,7 +27,7 @@ for (const tool of expenseTools)
     handlers[tool.name] = (n, a) => handleExpenses(n, a, client);
 for (const tool of utilityTools)
     handlers[tool.name] = (n, a) => handleUtilities(n, a, client);
-const server = new Server({ name: 'splitwise-mcp', version: '2.0.0' }, { capabilities: { tools: {} } });
+const server = new Server({ name: 'splitwise-mcp', version: '2.0.1' }, { capabilities: { tools: {} } });
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: allTools }));
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args = {} } = request.params;
