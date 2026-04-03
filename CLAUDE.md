@@ -59,12 +59,26 @@ SKILL.md            # Claude Code skill — teaches Claude when/how to use the t
 
 ## Versioning
 
-Version is set in **four places** — keep them in sync on every release:
+Version appears in FOUR places — all must match:
 
-1. `package.json` → `version`
-2. `src/index.ts` → `{ name: 'splitwise-mcp', version: '...' }` in the Server constructor
-3. `.claude-plugin/plugin.json` → `version`
-4. `.claude-plugin/marketplace.json` → `metadata.version` and `plugins[0].version` and `plugins[0].source.version`
+1. `package.json` → `"version"`
+2. `package-lock.json` → run `npm install --package-lock-only` after changing package.json
+3. `src/index.ts` → `Server` constructor `version` field
+4. `manifest.json` → `"version"`
+
+### Important
+
+Do NOT manually bump versions or create tags unless the user explicitly asks. Versioning is handled by the **Cut & Bump** GitHub Action.
+
+### Release workflow
+
+Main is always one version ahead of the latest tag. To release, run the **Cut & Bump** GitHub Action (`cut-and-bump.yml`) which:
+
+1. Runs CI (build + test)
+2. Tags the current commit with the current version
+3. Bumps patch in all four files
+4. Rebuilds, commits, and pushes main + tag
+5. The tag push triggers the **Release** workflow (CI + npm publish + GitHub release)
 
 ## Gotchas
 

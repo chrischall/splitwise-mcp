@@ -22,6 +22,9 @@ plugin.json
 .env
 .env.*
 
+# Docs
+docs/
+
 # Git
 .git/
 .gitignore
