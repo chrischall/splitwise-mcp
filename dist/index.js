@@ -1,54 +1,19 @@
 #!/usr/bin/env node
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { ListToolsRequestSchema, CallToolRequestSchema, } from '@modelcontextprotocol/sdk/types.js';
 import { SplitwiseClient } from './client.js';
-import { toolDefinitions as userTools, handleTool as handleUser } from './tools/user.js';
-import { toolDefinitions as groupTools, handleTool as handleGroups } from './tools/groups.js';
-import { toolDefinitions as friendTools, handleTool as handleFriends } from './tools/friends.js';
-import { toolDefinitions as expenseTools, handleTool as handleExpenses } from './tools/expenses.js';
-import { toolDefinitions as utilityTools, handleTool as handleUtilities } from './tools/utilities.js';
+import { registerUserTools } from './tools/user.js';
+import { registerGroupTools } from './tools/groups.js';
+import { registerFriendTools } from './tools/friends.js';
+import { registerExpenseTools } from './tools/expenses.js';
+import { registerUtilityTools } from './tools/utilities.js';
 const client = new SplitwiseClient();
-const allTools = [
-    ...userTools,
-    ...groupTools,
-    ...friendTools,
-    ...expenseTools,
-    ...utilityTools,
-];
-const handlers = {};
-for (const tool of userTools)
-    handlers[tool.name] = (n, a) => handleUser(n, a, client);
-for (const tool of groupTools)
-    handlers[tool.name] = (n, a) => handleGroups(n, a, client);
-for (const tool of friendTools)
-    handlers[tool.name] = (n, a) => handleFriends(n, a, client);
-for (const tool of expenseTools)
-    handlers[tool.name] = (n, a) => handleExpenses(n, a, client);
-for (const tool of utilityTools)
-    handlers[tool.name] = (n, a) => handleUtilities(n, a, client);
-const server = new Server({ name: 'splitwise-mcp', version: '2.0.1' }, { capabilities: { tools: {} } });
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: allTools }));
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args = {} } = request.params;
-    const handler = handlers[name];
-    if (!handler) {
-        return {
-            content: [{ type: 'text', text: `Unknown tool: ${name}` }],
-            isError: true,
-        };
-    }
-    try {
-        return await handler(name, args);
-    }
-    catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        return {
-            content: [{ type: 'text', text: `Error: ${message}` }],
-            isError: true,
-        };
-    }
-});
+const server = new McpServer({ name: 'splitwise-mcp', version: '2.0.2' });
+registerUserTools(server, client);
+registerGroupTools(server, client);
+registerFriendTools(server, client);
+registerExpenseTools(server, client);
+registerUtilityTools(server, client);
 console.error('[splitwise-mcp] This project was developed and is maintained by AI (Claude Sonnet 4.6). Use at your own discretion.');
 const transport = new StdioServerTransport();
 await server.connect(transport);

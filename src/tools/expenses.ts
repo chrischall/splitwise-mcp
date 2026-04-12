@@ -1,4 +1,5 @@
-import type { Tool, CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SplitwiseClient } from '../client.js';
 
 interface UserShare {
@@ -41,168 +42,106 @@ function buildExpenseBody(args: Record<string, unknown>): Record<string, unknown
   return body;
 }
 
-export const toolDefinitions: Tool[] = [
-  {
-    name: 'sw_list_expenses',
+const userShareSchema = z.object({
+  user_id: z.number(),
+  paid_share: z.string().describe('Amount this user paid, e.g. "25.00"'),
+  owed_share: z.string().describe('Amount this user owes, e.g. "12.50"'),
+});
+
+export function registerExpenseTools(server: McpServer, client: SplitwiseClient): void {
+  server.registerTool('sw_list_expenses', {
     description: 'List or search Splitwise expenses. All filters are optional. Use group_id to filter by group, dated_after/dated_before for date ranges.',
     annotations: { readOnlyHint: true },
     inputSchema: {
-      type: 'object',
-      properties: {
-        group_id: { type: 'integer', description: 'Only expenses in this group' },
-        friend_id: { type: 'integer', description: 'Only expenses with this friend' },
-        dated_after: { type: 'string', description: 'ISO 8601 date — only expenses on or after this date' },
-        dated_before: { type: 'string', description: 'ISO 8601 date — only expenses on or before this date' },
-        updated_after: { type: 'string', description: 'ISO 8601 datetime' },
-        updated_before: { type: 'string', description: 'ISO 8601 datetime' },
-        limit: { type: 'integer', description: 'Max results (API default: 20)' },
-        offset: { type: 'integer', description: 'Pagination offset' },
-      },
-      required: [],
+      group_id: z.number().describe('Only expenses in this group').optional(),
+      friend_id: z.number().describe('Only expenses with this friend').optional(),
+      dated_after: z.string().describe('ISO 8601 date — only expenses on or after this date').optional(),
+      dated_before: z.string().describe('ISO 8601 date — only expenses on or before this date').optional(),
+      updated_after: z.string().describe('ISO 8601 datetime').optional(),
+      updated_before: z.string().describe('ISO 8601 datetime').optional(),
+      limit: z.number().describe('Max results (API default: 20)').optional(),
+      offset: z.number().describe('Pagination offset').optional(),
     },
-  },
-  {
-    name: 'sw_get_expense',
+  }, async (args) => {
+    const params = new URLSearchParams();
+    const filters = ['group_id', 'friend_id', 'dated_after', 'dated_before', 'updated_after', 'updated_before', 'limit', 'offset'] as const;
+    for (const key of filters) {
+      const val = args[key];
+      if (val !== undefined) params.append(key, String(val));
+    }
+    const qs = params.toString();
+    const data = await client.request('GET', qs ? `/get_expenses?${qs}` : '/get_expenses');
+    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+  });
+
+  server.registerTool('sw_get_expense', {
     description: 'Get full details of a single Splitwise expense by id.',
     annotations: { readOnlyHint: true },
     inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'integer', description: 'Expense ID' },
-      },
-      required: ['id'],
+      id: z.number().describe('Expense ID'),
     },
-  },
-  {
-    name: 'sw_create_expense',
+  }, async ({ id }) => {
+    const data = await client.request('GET', `/get_expense/${id}`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+  });
+
+  server.registerTool('sw_create_expense', {
     description: 'Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string.',
     inputSchema: {
-      type: 'object',
-      properties: {
-        group_id: { type: 'integer', description: 'Group to add expense to (use 0 for no group)' },
-        description: { type: 'string', description: 'Short description of the expense' },
-        cost: { type: 'string', description: 'Total cost as decimal string, e.g. "25.00"' },
-        split_equally: { type: 'boolean', description: 'Split equally among group members (mutually exclusive with users)' },
-        users: {
-          type: 'array',
-          description: 'Custom split (mutually exclusive with split_equally). Full list of participants required.',
-          items: {
-            type: 'object',
-            properties: {
-              user_id: { type: 'integer' },
-              paid_share: { type: 'string', description: 'Amount this user paid, e.g. "25.00"' },
-              owed_share: { type: 'string', description: 'Amount this user owes, e.g. "12.50"' },
-            },
-            required: ['user_id', 'paid_share', 'owed_share'],
-          },
-        },
-        currency_code: { type: 'string', description: 'Currency code, e.g. "USD". Defaults to group/user default.' },
-        date: { type: 'string', description: 'ISO 8601 datetime' },
-        category_id: { type: 'integer', description: 'Category id from sw_get_categories' },
-        details: { type: 'string', description: 'Notes' },
-      },
-      required: ['group_id', 'description', 'cost'],
+      group_id: z.number().describe('Group to add expense to (use 0 for no group)'),
+      description: z.string().describe('Short description of the expense'),
+      cost: z.string().describe('Total cost as decimal string, e.g. "25.00"'),
+      split_equally: z.boolean().describe('Split equally among group members (mutually exclusive with users)').optional(),
+      users: z.array(userShareSchema).describe('Custom split (mutually exclusive with split_equally). Full list of participants required.').optional(),
+      currency_code: z.string().describe('Currency code, e.g. "USD". Defaults to group/user default.').optional(),
+      date: z.string().describe('ISO 8601 datetime').optional(),
+      category_id: z.number().describe('Category id from sw_get_categories').optional(),
+      details: z.string().describe('Notes').optional(),
     },
-  },
-  {
-    name: 'sw_update_expense',
+  }, async (args) => {
+    const body = buildExpenseBody(args as Record<string, unknown>);
+    const data = await client.request('POST', '/create_expense', body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+  });
+
+  server.registerTool('sw_update_expense', {
     description: 'Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split).',
     inputSchema: {
-      type: 'object',
-      properties: {
-        expense_id: { type: 'integer', description: 'ID of the expense to update' },
-        description: { type: 'string' },
-        cost: { type: 'string', description: 'Decimal string, e.g. "25.00"' },
-        split_equally: { type: 'boolean', description: 'Mutually exclusive with users' },
-        users: {
-          type: 'array',
-          description: 'Full replacement split — all users must be included. Mutually exclusive with split_equally.',
-          items: {
-            type: 'object',
-            properties: {
-              user_id: { type: 'integer' },
-              paid_share: { type: 'string' },
-              owed_share: { type: 'string' },
-            },
-            required: ['user_id', 'paid_share', 'owed_share'],
-          },
-        },
-        currency_code: { type: 'string' },
-        date: { type: 'string' },
-        category_id: { type: 'integer' },
-        details: { type: 'string' },
-      },
-      required: ['expense_id'],
+      expense_id: z.number().describe('ID of the expense to update'),
+      description: z.string().optional(),
+      cost: z.string().describe('Decimal string, e.g. "25.00"').optional(),
+      split_equally: z.boolean().describe('Mutually exclusive with users').optional(),
+      users: z.array(userShareSchema).describe('Full replacement split — all users must be included. Mutually exclusive with split_equally.').optional(),
+      currency_code: z.string().optional(),
+      date: z.string().optional(),
+      category_id: z.number().optional(),
+      details: z.string().optional(),
     },
-  },
-  {
-    name: 'sw_delete_expense',
+  }, async (args) => {
+    const { expense_id } = args;
+    const body = buildExpenseBody(args as Record<string, unknown>);
+    const data = await client.request('POST', `/update_expense/${expense_id}`, body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+  });
+
+  server.registerTool('sw_delete_expense', {
     description: 'Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore.',
     annotations: { destructiveHint: true },
     inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'integer', description: 'Expense ID to delete' },
-      },
-      required: ['id'],
+      id: z.number().describe('Expense ID to delete'),
     },
-  },
-  {
-    name: 'sw_undelete_expense',
+  }, async ({ id }) => {
+    const data = await client.request('POST', `/delete_expense/${id}`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+  });
+
+  server.registerTool('sw_undelete_expense', {
     description: 'Restore a soft-deleted Splitwise expense.',
     inputSchema: {
-      type: 'object',
-      properties: {
-        id: { type: 'integer', description: 'Expense ID to restore' },
-      },
-      required: ['id'],
+      id: z.number().describe('Expense ID to restore'),
     },
-  },
-];
-
-export async function handleTool(
-  name: string,
-  args: Record<string, unknown>,
-  client: SplitwiseClient
-): Promise<CallToolResult> {
-  switch (name) {
-    case 'sw_list_expenses': {
-      const params = new URLSearchParams();
-      const filters = ['group_id', 'friend_id', 'dated_after', 'dated_before', 'updated_after', 'updated_before', 'limit', 'offset'];
-      for (const key of filters) {
-        if (args[key] !== undefined) params.append(key, String(args[key]));
-      }
-      const qs = params.toString();
-      const data = await client.request('GET', qs ? `/get_expenses?${qs}` : '/get_expenses');
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
-    }
-    case 'sw_get_expense': {
-      const { id } = args as { id: number };
-      const data = await client.request('GET', `/get_expense/${id}`);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
-    }
-    case 'sw_create_expense': {
-      const body = buildExpenseBody(args);
-      const data = await client.request('POST', '/create_expense', body);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
-    }
-    case 'sw_update_expense': {
-      const { expense_id } = args as { expense_id: number };
-      const body = buildExpenseBody(args);
-      const data = await client.request('POST', `/update_expense/${expense_id}`, body);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
-    }
-    case 'sw_delete_expense': {
-      const { id } = args as { id: number };
-      const data = await client.request('POST', `/delete_expense/${id}`);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
-    }
-    case 'sw_undelete_expense': {
-      const { id } = args as { id: number };
-      const data = await client.request('POST', `/undelete_expense/${id}`);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
-    }
-    default:
-      throw new Error(`Unknown tool: ${name}`);
-  }
+  }, async ({ id }) => {
+    const data = await client.request('POST', `/undelete_expense/${id}`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+  });
 }
