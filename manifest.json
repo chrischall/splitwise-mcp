@@ -3,7 +3,7 @@
   "manifest_version": "0.3",
   "name": "splitwise-mcp",
   "display_name": "Splitwise",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Splitwise expense and group management for Claude — track shared expenses, settle up, and manage friends via natural language",
   "author": {
     "name": "Chris Chall",
