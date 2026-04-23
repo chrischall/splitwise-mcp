@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.chrischall/splitwise-mcp",
-  "description": "Splitwise expense and group management for Claude — track shared expenses, settle up, and manage friends via natural language",
+  "description": "Splitwise expense and group management for Claude \u2014 shared expenses, settle up, friends",
   "repository": {
     "url": "https://github.com/chrischall/splitwise-mcp",
     "source": "github"
