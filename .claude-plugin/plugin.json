@@ -1,7 +1,7 @@
 {
   "name": "splitwise-mcp",
   "displayName": "Splitwise",
-  "version": "1.3.0",
+  "version": "2.0.3",
   "description": "MCP server for Splitwise — natural-language expense and group management via the Splitwise API",
   "author": {
     "name": "Chris Hall",
@@ -10,7 +10,12 @@
   "homepage": "https://github.com/chrischall/splitwise-mcp",
   "repository": "https://github.com/chrischall/splitwise-mcp",
   "license": "MIT",
-  "keywords": ["splitwise", "expenses", "mcp", "finance"],
+  "keywords": [
+    "splitwise",
+    "expenses",
+    "mcp",
+    "finance"
+  ],
   "skills": "./SKILL.md",
   "mcp": "./.mcp.json"
 }

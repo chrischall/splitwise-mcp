@@ -4,16 +4,34 @@ import { fileURLToPath } from 'url';
 try {
     const { config } = await import('dotenv');
     const __dirname = dirname(fileURLToPath(import.meta.url));
-    config({ path: join(__dirname, '..', '.env'), override: false });
+    config({ path: join(__dirname, '..', '.env'), override: false, quiet: true });
 }
 catch {
     // not available — rely on process.env (mcpb sets credentials via mcp_config.env)
+}
+/**
+ * Read an env var, trim whitespace, and treat as unset if blank or if the value
+ * looks like an unsubstituted shell placeholder (e.g. `${FOO}`) — defends
+ * against MCP hosts that pass .mcp.json env blocks through unexpanded.
+ */
+function readVar(key) {
+    const raw = process.env[key];
+    if (typeof raw !== 'string')
+        return undefined;
+    const trimmed = raw.trim();
+    if (trimmed.length === 0)
+        return undefined;
+    if (trimmed === 'undefined' || trimmed === 'null')
+        return undefined;
+    if (/^\$\{[^}]*\}$/.test(trimmed))
+        return undefined;
+    return trimmed;
 }
 const BASE_URL = 'https://secure.splitwise.com/api/v3.0';
 export class SplitwiseClient {
     apiKey;
     constructor() {
-        const key = process.env.SPLITWISE_API_KEY;
+        const key = readVar('SPLITWISE_API_KEY');
         if (!key)
             throw new Error('SPLITWISE_API_KEY environment variable is required');
         this.apiKey = key;

@@ -30119,14 +30119,23 @@ import { fileURLToPath } from "url";
 try {
   const { config: config2 } = await import("dotenv");
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  config2({ path: join(__dirname, "..", ".env"), override: false });
+  config2({ path: join(__dirname, "..", ".env"), override: false, quiet: true });
 } catch {
+}
+function readVar(key) {
+  const raw = process.env[key];
+  if (typeof raw !== "string") return void 0;
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) return void 0;
+  if (trimmed === "undefined" || trimmed === "null") return void 0;
+  if (/^\$\{[^}]*\}$/.test(trimmed)) return void 0;
+  return trimmed;
 }
 var BASE_URL = "https://secure.splitwise.com/api/v3.0";
 var SplitwiseClient = class {
   apiKey;
   constructor() {
-    const key = process.env.SPLITWISE_API_KEY;
+    const key = readVar("SPLITWISE_API_KEY");
     if (!key) throw new Error("SPLITWISE_API_KEY environment variable is required");
     this.apiKey = key;
   }
@@ -30505,7 +30514,7 @@ function registerUtilityTools(server2, client2) {
 
 // src/index.ts
 var client = new SplitwiseClient();
-var server = new McpServer({ name: "splitwise-mcp", version: "2.0.2" });
+var server = new McpServer({ name: "splitwise-mcp", version: "2.0.3" });
 registerUserTools(server, client);
 registerGroupTools(server, client);
 registerFriendTools(server, client);

@@ -8,7 +8,7 @@ import { registerFriendTools } from './tools/friends.js';
 import { registerExpenseTools } from './tools/expenses.js';
 import { registerUtilityTools } from './tools/utilities.js';
 const client = new SplitwiseClient();
-const server = new McpServer({ name: 'splitwise-mcp', version: '2.0.2' });
+const server = new McpServer({ name: 'splitwise-mcp', version: '2.0.3' });
 registerUserTools(server, client);
 registerGroupTools(server, client);
 registerFriendTools(server, client);
