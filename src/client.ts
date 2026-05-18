@@ -28,12 +28,28 @@ function readVar(key: string): string | undefined {
 const BASE_URL = 'https://secure.splitwise.com/api/v3.0';
 
 export class SplitwiseClient {
-  private readonly apiKey: string;
+  private readonly apiKey: string | null;
+  private readonly configError: Error | null;
 
+  /**
+   * Defer the config error so the server can still start (and respond to the
+   * host's install-time smoke test) when SPLITWISE_API_KEY isn't set yet.
+   * Tool calls re-raise the error at request time.
+   */
   constructor() {
     const key = readVar('SPLITWISE_API_KEY');
-    if (!key) throw new Error('SPLITWISE_API_KEY environment variable is required');
-    this.apiKey = key;
+    if (!key) {
+      this.apiKey = null;
+      this.configError = new Error('SPLITWISE_API_KEY environment variable is required');
+    } else {
+      this.apiKey = key;
+      this.configError = null;
+    }
+  }
+
+  private requireKey(): string {
+    if (this.configError) throw this.configError;
+    return this.apiKey!;
   }
 
   async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -47,7 +63,7 @@ export class SplitwiseClient {
     isRetry: boolean
   ): Promise<T> {
     const headers: Record<string, string> = {
-      Authorization: `Bearer ${this.apiKey}`,
+      Authorization: `Bearer ${this.requireKey()}`,
       'Content-Type': 'application/json',
       Accept: 'application/json',
     };
