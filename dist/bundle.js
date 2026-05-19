@@ -30134,17 +30134,32 @@ function readVar(key) {
 var BASE_URL = "https://secure.splitwise.com/api/v3.0";
 var SplitwiseClient = class {
   apiKey;
+  configError;
+  /**
+   * Defer the config error so the server can still start (and respond to the
+   * host's install-time smoke test) when SPLITWISE_API_KEY isn't set yet.
+   * Tool calls re-raise the error at request time.
+   */
   constructor() {
     const key = readVar("SPLITWISE_API_KEY");
-    if (!key) throw new Error("SPLITWISE_API_KEY environment variable is required");
-    this.apiKey = key;
+    if (!key) {
+      this.apiKey = null;
+      this.configError = new Error("SPLITWISE_API_KEY environment variable is required");
+    } else {
+      this.apiKey = key;
+      this.configError = null;
+    }
+  }
+  requireKey() {
+    if (this.configError) throw this.configError;
+    return this.apiKey;
   }
   async request(method, path, body) {
     return this.doRequest(method, path, body, false);
   }
   async doRequest(method, path, body, isRetry) {
     const headers = {
-      Authorization: `Bearer ${this.apiKey}`,
+      Authorization: `Bearer ${this.requireKey()}`,
       "Content-Type": "application/json",
       Accept: "application/json"
     };
