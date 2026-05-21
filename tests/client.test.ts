@@ -15,19 +15,20 @@ describe('SplitwiseClient', () => {
     vi.unstubAllGlobals();
   });
 
-  it('throws at construction if SPLITWISE_API_KEY is not set', async () => {
+  it('defers the missing-key error until request time (constructor must not throw)', async () => {
     const { SplitwiseClient: Client } = await import('../src/client.js?no-key');
-    // We can't easily re-import without the key in vitest ESM. Instead test the guard directly.
-    // This is covered by the guard check in the constructor.
-    expect(() => {
-      const orig = process.env.SPLITWISE_API_KEY;
-      process.env.SPLITWISE_API_KEY = '';
-      try {
-        new Client();
-      } finally {
-        process.env.SPLITWISE_API_KEY = orig;
-      }
-    }).toThrow('SPLITWISE_API_KEY environment variable is required');
+    // Constructor stays silent so the server can boot and respond to the
+    // host's install-time smoke test before the user has filled in env vars.
+    const orig = process.env.SPLITWISE_API_KEY;
+    process.env.SPLITWISE_API_KEY = '';
+    try {
+      const client = new Client();
+      await expect(client.request('GET', '/anything')).rejects.toThrow(
+        'SPLITWISE_API_KEY environment variable is required',
+      );
+    } finally {
+      process.env.SPLITWISE_API_KEY = orig;
+    }
   });
 
   it('sends Authorization header with Bearer token', async () => {
