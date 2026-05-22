@@ -10,7 +10,7 @@ import { registerUtilityTools } from './tools/utilities.js';
 
 const client = new SplitwiseClient();
 
-const server = new McpServer({ name: 'splitwise-mcp', version: '2.0.4' });
+const server = new McpServer({ name: 'splitwise-mcp', version: '2.0.4' }); // x-release-please-version
 
 registerUserTools(server, client);
 registerGroupTools(server, client);
