@@ -23,6 +23,28 @@ Ask Claude things like:
 - [Node.js](https://nodejs.org) 20.6 or later
 - A [Splitwise](https://www.splitwise.com) account and API key
 
+## Acknowledgement of Terms
+
+By using this MCP server, you acknowledge and agree to the following:
+
+**1. This server accesses your own Splitwise account via Splitwise's official Developer API.** Auth happens via your own API consumer key + secret, which Splitwise issues to you when you register an app. It does not — and cannot — access anyone else's expenses or groups.
+
+**2. [Splitwise's Developer Terms](https://dev.splitwise.com/) govern your use of this server**. The clauses most relevant here:
+
+> You will use Splitwise Materials solely as necessary to develop, test and support a Self-Service integration of your software application… with Splitwise.
+
+And on rate limits: *"You will not use the API in a manner that exceeds rate limits, or constitutes excessive or abusive usage."* And on competitive use: *"You may not [use] Splitwise Materials to create an application that replicates existing Splitwise functionality or competes with Splitwise."*
+
+You are agreeing to those terms — read by the maintainer 2026-05-23 — every time you invoke a tool in this server.
+
+**3. Personal, non-commercial use only.** This project is not affiliated with, endorsed by, sponsored by, or in partnership with Splitwise, Inc. It is a personal automation tool that calls the documented public Splitwise REST API on your own account. Do not use it to commercialize Splitwise data, compete with Splitwise's product, or share API credentials with third parties.
+
+**4. Your API key is yours alone.** Splitwise issues credentials per-app, per-developer. **Do not commit your `SPLITWISE_API_KEY` (or consumer key/secret) to git**, do not paste it into shared chats, and do not embed it in a public client.
+
+**5. You accept full responsibility** for any consequences of using this server in connection with your Splitwise account — rate limiting, API key revocation, account warnings, or any enforcement action. If Splitwise objects to your use or your usage exceeds their rate limits, stop using this server.
+
+This section is the maintainer's good-faith summary of the terms — it is not legal advice and does not modify or supersede Splitwise's actual Developer Terms.
+
 ## Installation
 
 ### Option A -- npx (recommended)
