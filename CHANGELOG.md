@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.5](https://github.com/chrischall/splitwise-mcp/compare/v2.0.4...v2.0.5) (2026-05-25)
+
+
+### Bug Fixes
+
+* **ci:** prevent labeled event from cancelling auto-review ([#26](https://github.com/chrischall/splitwise-mcp/issues/26)) ([a18fd97](https://github.com/chrischall/splitwise-mcp/commit/a18fd97ed74332f5a551cbe2ab8ce18702e4c46b))
+
 ## [2.0.4](https://github.com/chrischall/splitwise-mcp/compare/v2.0.3...v2.0.4) (2026-05-24)
 
 
