@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.7](https://github.com/chrischall/splitwise-mcp/compare/v2.0.6...v2.0.7) (2026-05-26)
+
+
+### Bug Fixes
+
+* **ci:** substitute repo name in publish workflow ([#30](https://github.com/chrischall/splitwise-mcp/issues/30)) ([930b437](https://github.com/chrischall/splitwise-mcp/commit/930b437d239ef5e9f21df1398e6a9e3a37473108))
+
 ## [2.0.6](https://github.com/chrischall/splitwise-mcp/compare/v2.0.5...v2.0.6) (2026-05-26)
 
 
