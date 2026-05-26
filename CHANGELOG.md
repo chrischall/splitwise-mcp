@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.6](https://github.com/chrischall/splitwise-mcp/compare/v2.0.5...v2.0.6) (2026-05-26)
+
+
+### Documentation
+
+* **claude:** warn against opening PRs before the feature is done ([#28](https://github.com/chrischall/splitwise-mcp/issues/28)) ([c6f9f90](https://github.com/chrischall/splitwise-mcp/commit/c6f9f90bc6852e0dc9ccacf5a3630362788928e3))
+
 ## [2.0.5](https://github.com/chrischall/splitwise-mcp/compare/v2.0.4...v2.0.5) (2026-05-25)
 
 
