@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.8](https://github.com/chrischall/splitwise-mcp/compare/v2.0.7...v2.0.8) (2026-05-29)
+
+
+### Bug Fixes
+
+* **ci:** auto-merge arm guards ([#33](https://github.com/chrischall/splitwise-mcp/issues/33)) ([bff71b6](https://github.com/chrischall/splitwise-mcp/commit/bff71b6481699433e134170b75f3dbf3932ba7f5))
+
 ## [2.0.7](https://github.com/chrischall/splitwise-mcp/compare/v2.0.6...v2.0.7) (2026-05-26)
 
 
