@@ -35,7 +35,7 @@ describe('SplitwiseClient', () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ user: { id: 1 } }),
+      text: async () => JSON.stringify({ user: { id: 1 } }),
     });
     vi.stubGlobal('fetch', mockFetch);
 
@@ -68,7 +68,7 @@ describe('SplitwiseClient', () => {
   it('retries once on 429 then succeeds', async () => {
     const mockFetch = vi.fn()
       .mockResolvedValueOnce({ ok: false, status: 429, statusText: 'Too Many Requests' })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ ok: true }) });
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => JSON.stringify({ ok: true }) });
     vi.stubGlobal('fetch', mockFetch);
     vi.useFakeTimers();
 
@@ -130,7 +130,7 @@ describe('SplitwiseClient', () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ expense: {} }),
+      text: async () => JSON.stringify({ expense: {} }),
     });
     vi.stubGlobal('fetch', mockFetch);
 

@@ -1,6 +1,6 @@
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { loadDotenvSafely, readEnvVar, formatApiError } from '@chrischall/mcp-utils';
+import { loadDotenvSafely, readEnvVar, createApiClient, type ApiClient } from '@chrischall/mcp-utils';
 
 // Load .env for local dev; silently skip if dotenv is unavailable (e.g. mcpb
 // bundle). `loadDotenvSafely` swallows a missing dotenv module and never lets
@@ -26,6 +26,7 @@ const SERVICE_NAME = 'Splitwise';
 export class SplitwiseClient {
   private readonly apiKey: string | null;
   private readonly configError: Error | null;
+  private readonly api: ApiClient;
 
   /**
    * Defer the config error so the server can still start (and respond to the
@@ -41,6 +42,16 @@ export class SplitwiseClient {
       this.apiKey = key;
       this.configError = null;
     }
+
+    // `getToken` defers config errors to request time; on* handlers preserve Splitwise's documented 401/429 messages.
+    this.api = createApiClient({
+      baseUrl: BASE_URL,
+      getToken: () => this.requireKey(),
+      serviceName: SERVICE_NAME,
+      retry: { count: 1, delayMs: 2000 },
+      onUnauthorized: () => new Error('SPLITWISE_API_KEY is invalid or missing'),
+      onRateLimited: () => new Error('Rate limited by Splitwise API'),
+    });
   }
 
   private requireKey(): string {
@@ -49,50 +60,7 @@ export class SplitwiseClient {
   }
 
   async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    return this.doRequest<T>(method, path, body, false);
-  }
-
-  private async doRequest<T>(
-    method: string,
-    path: string,
-    body: unknown,
-    isRetry: boolean
-  ): Promise<T> {
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${this.requireKey()}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    };
-
-    const response = await fetch(`${BASE_URL}${path}`, {
-      method,
-      headers,
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-    });
-
-    if (response.status === 401) {
-      throw new Error('SPLITWISE_API_KEY is invalid or missing');
-    }
-
-    if (response.status === 429) {
-      if (!isRetry) {
-        await new Promise<void>((r) => setTimeout(r, 2000));
-        return this.doRequest<T>(method, path, body, true);
-      }
-      throw new Error('Rate limited by Splitwise API');
-    }
-
-    if (!response.ok) {
-      // Surface the upstream error body for debugging. `formatApiError` runs the
-      // body through redaction (Bearer tokens / JWTs) THEN truncation, so a body
-      // that echoes the request never leaks the API key back to the caller.
-      const errorText = await response.text().catch(() => '');
-      throw new Error(
-        formatApiError(response.status, method, path, errorText, { service: SERVICE_NAME })
-      );
-    }
-
-    return response.json() as Promise<T>;
+    return this.api.fetchJson<T>(method, path, body !== undefined ? { body } : {});
   }
 }
 
