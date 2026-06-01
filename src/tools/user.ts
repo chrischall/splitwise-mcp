@@ -1,14 +1,15 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { SplitwiseClient } from '../client.js';
+import { textResult } from '@chrischall/mcp-utils';
+import { client } from '../client.js';
 
-export function registerUserTools(server: McpServer, client: SplitwiseClient): void {
+export function registerUserTools(server: McpServer): void {
   server.registerTool('sw_get_current_user', {
     description: "Get the authenticated Splitwise user's profile (id, first_name, last_name, email). Use the returned id when building custom expense splits.",
     annotations: { readOnlyHint: true },
   }, async () => {
     const data = await client.request('GET', '/get_current_user');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_get_user', {
@@ -19,7 +20,7 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
     },
   }, async ({ id }) => {
     const data = await client.request('GET', `/get_user/${id}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_update_user', {
@@ -42,6 +43,6 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
     if (locale !== undefined) body.locale = locale;
     if (default_currency !== undefined) body.default_currency = default_currency;
     const data = await client.request('POST', `/update_user/${id}`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 }

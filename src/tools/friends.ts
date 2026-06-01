@@ -1,14 +1,15 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { SplitwiseClient } from '../client.js';
+import { textResult } from '@chrischall/mcp-utils';
+import { client } from '../client.js';
 
-export function registerFriendTools(server: McpServer, client: SplitwiseClient): void {
+export function registerFriendTools(server: McpServer): void {
   server.registerTool('sw_list_friends', {
     description: "List all Splitwise friends with their id, first_name, last_name, and email. Use this to resolve a friend's name to a user_id before adding them to a group or building a custom expense split.",
     annotations: { readOnlyHint: true },
   }, async () => {
     const data = await client.request('GET', '/get_friends');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_create_friend', {
@@ -23,7 +24,7 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
     if (user_first_name !== undefined) body.user_first_name = user_first_name;
     if (user_last_name !== undefined) body.user_last_name = user_last_name;
     const data = await client.request('POST', '/create_friend', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_delete_friend', {
@@ -34,6 +35,6 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
     },
   }, async ({ id }) => {
     const data = await client.request('POST', `/delete_friend/${id}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 }

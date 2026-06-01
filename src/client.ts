@@ -1,31 +1,27 @@
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { loadDotenvSafely, readEnvVar, formatApiError } from '@chrischall/mcp-utils';
 
-// Load .env for local dev; silently skip if dotenv is unavailable (e.g. mcpb bundle)
-try {
-  const { config } = await import('dotenv');
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  config({ path: join(__dirname, '..', '.env'), override: false, quiet: true });
-} catch {
-  // not available — rely on process.env (mcpb sets credentials via mcp_config.env)
-}
+// Load .env for local dev; silently skip if dotenv is unavailable (e.g. mcpb
+// bundle). `loadDotenvSafely` swallows a missing dotenv module and never lets
+// .env override a host-provided value.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+await loadDotenvSafely({ path: join(__dirname, '..', '.env'), override: false });
 
 /**
  * Read an env var, trim whitespace, and treat as unset if blank or if the value
  * looks like an unsubstituted shell placeholder (e.g. `${FOO}`) — defends
  * against MCP hosts that pass .mcp.json env blocks through unexpanded.
+ *
+ * Backed by the shared `readEnvVar` from `@chrischall/mcp-utils`, which applies
+ * the same trim + blank/`undefined`/`null`/`${...}`-placeholder suppression.
  */
 function readVar(key: string): string | undefined {
-  const raw = process.env[key];
-  if (typeof raw !== 'string') return undefined;
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) return undefined;
-  if (trimmed === 'undefined' || trimmed === 'null') return undefined;
-  if (/^\$\{[^}]*\}$/.test(trimmed)) return undefined;
-  return trimmed;
+  return readEnvVar(key);
 }
 
 const BASE_URL = 'https://secure.splitwise.com/api/v3.0';
+const SERVICE_NAME = 'Splitwise';
 
 export class SplitwiseClient {
   private readonly apiKey: string | null;
@@ -87,11 +83,23 @@ export class SplitwiseClient {
     }
 
     if (!response.ok) {
+      // Surface the upstream error body for debugging. `formatApiError` runs the
+      // body through redaction (Bearer tokens / JWTs) THEN truncation, so a body
+      // that echoes the request never leaks the API key back to the caller.
+      const errorText = await response.text().catch(() => '');
       throw new Error(
-        `Splitwise API error: ${response.status} ${response.statusText} for ${method} ${path}`
+        formatApiError(response.status, method, path, errorText, { service: SERVICE_NAME })
       );
     }
 
     return response.json() as Promise<T>;
   }
 }
+
+/**
+ * Module-level singleton shared by every tool module. Constructing it here (not
+ * in `index.ts`) keeps the deferred-config-error pattern: the server boots and
+ * answers the host's install-time tools/list smoke test even when the API key is
+ * absent — the error only surfaces on the first request.
+ */
+export const client = new SplitwiseClient();

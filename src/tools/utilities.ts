@@ -1,14 +1,15 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { SplitwiseClient } from '../client.js';
+import { textResult, buildQueryString } from '@chrischall/mcp-utils';
+import { client } from '../client.js';
 
-export function registerUtilityTools(server: McpServer, client: SplitwiseClient): void {
+export function registerUtilityTools(server: McpServer): void {
   server.registerTool('sw_get_notifications', {
     description: 'Get recent Splitwise activity notifications for the current user.',
     annotations: { readOnlyHint: true },
   }, async () => {
     const data = await client.request('GET', '/get_notifications');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_get_categories', {
@@ -16,7 +17,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     annotations: { readOnlyHint: true },
   }, async () => {
     const data = await client.request('GET', '/get_categories');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_get_currencies', {
@@ -24,7 +25,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     annotations: { readOnlyHint: true },
   }, async () => {
     const data = await client.request('GET', '/get_currencies');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_get_comments', {
@@ -34,8 +35,10 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
       expense_id: z.number().describe('Expense ID to get comments for'),
     },
   }, async ({ expense_id }) => {
-    const data = await client.request('GET', `/get_comments?expense_id=${expense_id}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    // buildQueryString percent-encodes the value — defense-in-depth against
+    // query-param injection (already constrained to a number by the schema).
+    const data = await client.request('GET', `/get_comments${buildQueryString({ expense_id })}`);
+    return textResult(data);
   });
 
   server.registerTool('sw_create_comment', {
@@ -46,7 +49,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     },
   }, async ({ expense_id, content }) => {
     const data = await client.request('POST', '/create_comment', { expense_id, content });
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_delete_comment', {
@@ -57,6 +60,6 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     },
   }, async ({ id }) => {
     const data = await client.request('POST', `/delete_comment/${id}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 }

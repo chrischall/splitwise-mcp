@@ -1,6 +1,4 @@
-import { describe, it, expect, vi, afterAll } from 'vitest';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { SplitwiseClient } from '../src/client.js';
+import { describe, it, expect, afterAll } from 'vitest';
 import { registerUserTools } from '../src/tools/user.js';
 import { registerGroupTools } from '../src/tools/groups.js';
 import { registerFriendTools } from '../src/tools/friends.js';
@@ -12,8 +10,6 @@ import { createTestHarness } from './helpers.js';
 // We register all tools on a McpServer and list them via a connected client.
 
 describe('tool registry', () => {
-  const mockClient = { request: vi.fn() } as unknown as SplitwiseClient;
-
   let harness: Awaited<ReturnType<typeof createTestHarness>>;
 
   afterAll(async () => {
@@ -22,11 +18,11 @@ describe('tool registry', () => {
 
   it('includes all 25 expected tools', async () => {
     harness = await createTestHarness((server) => {
-      registerUserTools(server, mockClient);
-      registerGroupTools(server, mockClient);
-      registerFriendTools(server, mockClient);
-      registerExpenseTools(server, mockClient);
-      registerUtilityTools(server, mockClient);
+      registerUserTools(server);
+      registerGroupTools(server);
+      registerFriendTools(server);
+      registerExpenseTools(server);
+      registerUtilityTools(server);
     });
 
     const tools = await harness.listTools();
