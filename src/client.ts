@@ -43,12 +43,7 @@ export class SplitwiseClient {
       this.configError = null;
     }
 
-    // Shared bearer-auth client from @chrischall/mcp-utils. `getToken` defers to
-    // `requireKey`, preserving the deferred-config-error pattern: the config
-    // error only surfaces when a tool actually makes a request. The
-    // `onUnauthorized`/`onRateLimited` factories (mcp-utils ≥ 0.2.0) keep
-    // Splitwise's documented 401/429 messages instead of the generic ones. They
-    // take no arguments, so the API key is never embedded in a thrown message.
+    // `getToken` defers config errors to request time; on* handlers preserve Splitwise's documented 401/429 messages.
     this.api = createApiClient({
       baseUrl: BASE_URL,
       getToken: () => this.requireKey(),
