@@ -1,19 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
-import type { SplitwiseClient } from '../../src/client.js';
+import { client } from '../../src/client.js';
 import { registerFriendTools } from '../../src/tools/friends.js';
 import { createTestHarness } from '../helpers.js';
 
-const mockRequest = vi.fn();
-const mockClient = { request: mockRequest } as unknown as SplitwiseClient;
+// Tool registrars use the module-level `client` singleton; spy on its `request`.
+const mockRequest = vi.spyOn(client, 'request').mockResolvedValue(undefined as never);
 
 let harness: Awaited<ReturnType<typeof createTestHarness>>;
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => mockRequest.mockClear());
 afterAll(async () => { if (harness) await harness.close(); });
 
 describe('friend tools', () => {
   it('setup', async () => {
-    harness = await createTestHarness((server) => registerFriendTools(server, mockClient));
+    harness = await createTestHarness((server) => registerFriendTools(server));
   });
 
   describe('sw_list_friends', () => {

@@ -1,14 +1,15 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { SplitwiseClient } from '../client.js';
+import { textResult } from '@chrischall/mcp-utils';
+import { client } from '../client.js';
 
-export function registerGroupTools(server: McpServer, client: SplitwiseClient): void {
+export function registerGroupTools(server: McpServer): void {
   server.registerTool('sw_list_groups', {
     description: 'List all Splitwise groups the current user belongs to. Returns id, name, and members for each group. Use this to resolve a group name to its id.',
     annotations: { readOnlyHint: true },
   }, async () => {
     const data = await client.request('GET', '/get_groups');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_get_group', {
@@ -19,7 +20,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     },
   }, async ({ id }) => {
     const data = await client.request('GET', `/get_group/${id}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_create_group', {
@@ -34,7 +35,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     if (group_type !== undefined) body.group_type = group_type;
     if (simplify_by_default !== undefined) body.simplify_by_default = simplify_by_default;
     const data = await client.request('POST', '/create_group', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_add_user_to_group', {
@@ -57,7 +58,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
       body = { group_id, first_name, last_name, email };
     }
     const data = await client.request('POST', '/add_user_to_group', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_remove_user_from_group', {
@@ -68,7 +69,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     },
   }, async ({ group_id, user_id }) => {
     const data = await client.request('POST', '/remove_user_from_group', { group_id, user_id });
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_delete_group', {
@@ -79,7 +80,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     },
   }, async ({ id }) => {
     const data = await client.request('POST', `/delete_group/${id}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_undelete_group', {
@@ -89,6 +90,6 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     },
   }, async ({ id }) => {
     const data = await client.request('POST', `/undelete_group/${id}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import type { SplitwiseClient } from '../client.js';
+import { textResult, buildQueryString } from '@chrischall/mcp-utils';
+import { client } from '../client.js';
 
 interface UserShare {
   user_id: number;
@@ -48,7 +49,7 @@ const userShareSchema = z.object({
   owed_share: z.string().describe('Amount this user owes, e.g. "12.50"'),
 });
 
-export function registerExpenseTools(server: McpServer, client: SplitwiseClient): void {
+export function registerExpenseTools(server: McpServer): void {
   server.registerTool('sw_list_expenses', {
     description: 'List or search Splitwise expenses. All filters are optional. Use group_id to filter by group, dated_after/dated_before for date ranges.',
     annotations: { readOnlyHint: true },
@@ -63,15 +64,18 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
       offset: z.number().describe('Pagination offset').optional(),
     },
   }, async (args) => {
-    const params = new URLSearchParams();
-    const filters = ['group_id', 'friend_id', 'dated_after', 'dated_before', 'updated_after', 'updated_before', 'limit', 'offset'] as const;
-    for (const key of filters) {
-      const val = args[key];
-      if (val !== undefined) params.append(key, String(val));
-    }
-    const qs = params.toString();
-    const data = await client.request('GET', qs ? `/get_expenses?${qs}` : '/get_expenses');
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    const qs = buildQueryString({
+      group_id: args.group_id,
+      friend_id: args.friend_id,
+      dated_after: args.dated_after,
+      dated_before: args.dated_before,
+      updated_after: args.updated_after,
+      updated_before: args.updated_before,
+      limit: args.limit,
+      offset: args.offset,
+    });
+    const data = await client.request('GET', `/get_expenses${qs}`);
+    return textResult(data);
   });
 
   server.registerTool('sw_get_expense', {
@@ -82,7 +86,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     },
   }, async ({ id }) => {
     const data = await client.request('GET', `/get_expense/${id}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_create_expense', {
@@ -101,7 +105,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
   }, async (args) => {
     const body = buildExpenseBody(args as Record<string, unknown>);
     const data = await client.request('POST', '/create_expense', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_update_expense', {
@@ -121,7 +125,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     const { expense_id } = args;
     const body = buildExpenseBody(args as Record<string, unknown>);
     const data = await client.request('POST', `/update_expense/${expense_id}`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_delete_expense', {
@@ -132,7 +136,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     },
   }, async ({ id }) => {
     const data = await client.request('POST', `/delete_expense/${id}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 
   server.registerTool('sw_undelete_expense', {
@@ -142,6 +146,6 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     },
   }, async ({ id }) => {
     const data = await client.request('POST', `/undelete_expense/${id}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] };
+    return textResult(data);
   });
 }

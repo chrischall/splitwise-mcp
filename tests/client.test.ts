@@ -103,11 +103,26 @@ describe('SplitwiseClient', () => {
       ok: false,
       status: 500,
       statusText: 'Internal Server Error',
+      text: async () => '',
     }));
 
     const client = new SplitwiseClient();
     await expect(client.request('GET', '/get_current_user')).rejects.toThrow(
-      'Splitwise API error: 500 Internal Server Error for GET /get_current_user'
+      'Splitwise error 500 for GET /get_current_user'
+    );
+  });
+
+  it('surfaces (redacted, truncated) upstream error body on non-2xx', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      text: async () => JSON.stringify({ errors: { base: ['Invalid expense'] } }),
+    }));
+
+    const client = new SplitwiseClient();
+    await expect(client.request('POST', '/create_expense', {})).rejects.toThrow(
+      'Splitwise error 400 for POST /create_expense: {"errors":{"base":["Invalid expense"]}}'
     );
   });
 
