@@ -52,6 +52,23 @@ describe('SplitwiseClient', () => {
     );
   });
 
+  it('bounds every request with a timeout (passes an AbortSignal to fetch)', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '{}',
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const client = new SplitwiseClient();
+    await client.request('GET', '/get_current_user');
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    // createApiClient only sets a signal when its `timeout` option is configured.
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect((init.signal as AbortSignal).aborted).toBe(false);
+  });
+
   it('throws on 401', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,

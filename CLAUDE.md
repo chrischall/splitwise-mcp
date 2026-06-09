@@ -48,7 +48,7 @@ Each tool file exports a `register<Domain>Tools(server, client)` function that c
 SPLITWISE_API_KEY=<your key>   # Required. From https://secure.splitwise.com/apps/register
 ```
 
-Loaded via `dotenv` from `.env` next to `dist/`. `dotenv` is imported dynamically and failure is swallowed (mcpb bundles omit it; env is provided by the host). `readVar()` in `client.ts` treats blank, `"undefined"`, `"null"`, and unsubstituted `${FOO}` placeholders as unset.
+Loaded via `dotenv` from `.env` next to `dist/`. `dotenv` is imported dynamically and failure is swallowed (mcpb bundles omit it; env is provided by the host). `readEnvVar` (from `@chrischall/mcp-utils`) treats blank, `"undefined"`, `"null"`, and unsubstituted `${FOO}` placeholders as unset.
 
 ## Testing
 
