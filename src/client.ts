@@ -8,18 +8,6 @@ import { loadDotenvSafely, readEnvVar, createApiClient, type ApiClient } from '@
 const __dirname = dirname(fileURLToPath(import.meta.url));
 await loadDotenvSafely({ path: join(__dirname, '..', '.env'), override: false });
 
-/**
- * Read an env var, trim whitespace, and treat as unset if blank or if the value
- * looks like an unsubstituted shell placeholder (e.g. `${FOO}`) — defends
- * against MCP hosts that pass .mcp.json env blocks through unexpanded.
- *
- * Backed by the shared `readEnvVar` from `@chrischall/mcp-utils`, which applies
- * the same trim + blank/`undefined`/`null`/`${...}`-placeholder suppression.
- */
-function readVar(key: string): string | undefined {
-  return readEnvVar(key);
-}
-
 const BASE_URL = 'https://secure.splitwise.com/api/v3.0';
 const SERVICE_NAME = 'Splitwise';
 
@@ -34,7 +22,10 @@ export class SplitwiseClient {
    * Tool calls re-raise the error at request time.
    */
   constructor() {
-    const key = readVar('SPLITWISE_API_KEY');
+    // readEnvVar trims whitespace and treats blank/`undefined`/`null`/`${...}`
+    // placeholder values as unset — defends against MCP hosts that pass
+    // .mcp.json env blocks through unexpanded.
+    const key = readEnvVar('SPLITWISE_API_KEY');
     if (!key) {
       this.apiKey = null;
       this.configError = new Error('SPLITWISE_API_KEY environment variable is required');
@@ -49,6 +40,7 @@ export class SplitwiseClient {
       getToken: () => this.requireKey(),
       serviceName: SERVICE_NAME,
       retry: { count: 1, delayMs: 2000 },
+      timeout: 30_000,
       onUnauthorized: () => new Error('SPLITWISE_API_KEY is invalid or missing'),
       onRateLimited: () => new Error('Rate limited by Splitwise API'),
     });
