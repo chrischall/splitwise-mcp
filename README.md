@@ -1,5 +1,9 @@
 # Splitwise MCP
 
+[![CI](https://github.com/chrischall/splitwise-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/chrischall/splitwise-mcp/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/splitwise-mcp)](https://www.npmjs.com/package/splitwise-mcp)
+[![license](https://img.shields.io/npm/l/splitwise-mcp)](LICENSE)
+
 A [Model Context Protocol](https://modelcontextprotocol.io) server that connects Claude to [Splitwise](https://www.splitwise.com), giving you natural-language access to your expenses, groups, friends, and balances.
 
 > [!WARNING]
