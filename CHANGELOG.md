@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.0.9](https://github.com/chrischall/splitwise-mcp/compare/v2.0.8...v2.0.9) (2026-06-13)
+
+
+### Bug Fixes
+
+* bot PRs bypass the CI gate unconditionally (upstream curtaincall[#86](https://github.com/chrischall/splitwise-mcp/issues/86) review) ([#54](https://github.com/chrischall/splitwise-mcp/issues/54)) ([2e34581](https://github.com/chrischall/splitwise-mcp/commit/2e34581837c215f17dc5d815b54c860d22a85adf))
+
+
+### Documentation
+
+* add MIT LICENSE file and README badges ([#52](https://github.com/chrischall/splitwise-mcp/issues/52)) ([46d8bea](https://github.com/chrischall/splitwise-mcp/commit/46d8bea6726569a673f98e8c1d95b81d905a5551))
+* correct Versioning section to describe release-please ([#50](https://github.com/chrischall/splitwise-mcp/issues/50)) ([0918780](https://github.com/chrischall/splitwise-mcp/commit/0918780e527beea3f8accaf116343c82c672902f))
+
 ## [2.0.8](https://github.com/chrischall/splitwise-mcp/compare/v2.0.7...v2.0.8) (2026-05-29)
 
 
