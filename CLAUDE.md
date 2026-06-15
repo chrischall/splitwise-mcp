@@ -1,6 +1,6 @@
 # splitwise-mcp
 
-MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 24 tools to Claude over stdio.
+MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 25 tools to Claude over stdio. Built on `@chrischall/mcp-utils` (`runMcp`, `createApiClient`, `readEnvVar`, `textResult`).
 
 ## Commands
 
@@ -24,10 +24,10 @@ All tools are prefixed `sw_` (e.g. `sw_list_expenses`, `sw_create_expense`).
 
 ```
 src/
-  index.ts        # MCP server entry — constructs McpServer + SplitwiseClient,
-                  #   calls each register*Tools(), connects StdioServerTransport
-  client.ts       # SplitwiseClient — reads SPLITWISE_API_KEY, bearer-auth fetch,
-                  #   one 2s retry on 429, throws on 401
+  index.ts        # MCP server entry — calls runMcp() from @chrischall/mcp-utils
+                  #   with name/version/banner + the register*Tools array
+  client.ts       # SplitwiseClient (createApiClient wrapper) + exported `client`
+                  #   singleton; reads SPLITWISE_API_KEY, 1× 2s retry, 30s timeout
   tools/
     user.ts       # sw_get_current_user, sw_get_user, sw_update_user
     groups.ts     # sw_list_groups, sw_get_group, sw_create_group,
@@ -40,7 +40,7 @@ src/
                   #   sw_get_comments, sw_create_comment, sw_delete_comment
 ```
 
-Each tool file exports a `register<Domain>Tools(server, client)` function that calls `server.registerTool(name, { description, annotations, inputSchema }, handler)` (high-level `McpServer` API with zod schemas). `index.ts` just wires them all up.
+Each tool file exports a `register<Domain>Tools(server)` function that calls `server.registerTool(name, { description, annotations, inputSchema }, handler)` (high-level `McpServer` API with zod schemas) and imports the shared `client` singleton from `./client.js`. `index.ts` passes the register functions to `runMcp`, which builds the `McpServer`, calls each, and connects the stdio transport.
 
 ## Environment
 
@@ -48,7 +48,7 @@ Each tool file exports a `register<Domain>Tools(server, client)` function that c
 SPLITWISE_API_KEY=<your key>   # Required. From https://secure.splitwise.com/apps/register
 ```
 
-Loaded via `dotenv` from `.env` next to `dist/`. `dotenv` is imported dynamically and failure is swallowed (mcpb bundles omit it; env is provided by the host). `readEnvVar` (from `@chrischall/mcp-utils`) treats blank, `"undefined"`, `"null"`, and unsubstituted `${FOO}` placeholders as unset.
+Loaded via `loadDotenvSafely` (from `@chrischall/mcp-utils`) from `.env` next to `dist/`, with `override: false` so a host-provided value always wins; a missing `dotenv` module is swallowed (mcpb bundles externalize it — see `bundle` script's `--external:dotenv` — and the host provides env). `readEnvVar` (also from `@chrischall/mcp-utils`) treats blank, `"undefined"`, `"null"`, and unsubstituted `${FOO}` placeholders as unset.
 
 ## Testing
 
@@ -122,8 +122,8 @@ The **PR title MUST be a Conventional Commit**, written user-facing (`fix(scope)
 
 **Don't run `gh pr merge` yourself.** The automation does it:
 
-1. `pr-auto-review.yml` runs a Claude review on every PR **except** the release-please release PR (which it deliberately skips). On a `pass` verdict it adds the `ready-to-merge` label.
-2. `auto-merge.yml`, on the `ready-to-merge` label (or on a dependabot PR), arms `gh pr merge --auto --squash`. The moment CI is green the PR squash-merges itself.
+1. `pr-auto-review.yml` (a thin stub calling `chrischall/workflows`) runs a Claude review on every PR **except** the release-please release PR (which it deliberately skips). A `pass` **or** `warn` verdict adds the `ready-to-merge` label; a `warn` or `fail` also opens/updates an `auto-review-followup` issue (see below). Only a `fail` blocks the merge.
+2. `auto-merge.yml` (also a stub calling `chrischall/workflows`), on the `ready-to-merge` label (or on a dependabot PR), arms `gh pr merge --auto --squash`. The moment CI is green the PR squash-merges itself.
 
 For ordinary feature/fix PRs, opening with `gh pr create --label <label>` (or `--label ignore-for-release` for chores not worth a release-notes line) is the whole job. If Claude's verdict was `warn`/`fail` but you've decided to ship anyway, add the label yourself: `gh pr edit <num> --add-label ready-to-merge`.
 
@@ -140,11 +140,24 @@ Because PRs auto-merge as soon as auto-review passes, **do not open a PR until t
 
 The repo allows squash-merge only — `--merge` and `--rebase` are blocked at the branch-protection ruleset level.
 
+### Auto-review follow-up issues
+
+When a PR's auto-review verdict is `warn` or `fail`, the `chrischall/workflows` pipeline opens or updates a single `auto-review-followup` issue ("Auto-review follow-ups for PR #N") whose checklist captures every finding, and links it from the PR's `<!-- auto-review-verdict -->` comment (`📋 Tracking follow-ups: #N`). `warn` (nits only) still auto-merges — the issue carries the nits forward, so most nits are fixed in a *later* PR; `fail` blocks until the important findings are addressed on the PR itself.
+
+When asked to address the auto-review comments / review findings on a PR:
+
+1. Read the verdict comment, open the linked `auto-review-followup` issue, and treat its checklist as the work list (alongside any inline review comments).
+2. Resolve each item, checking off only what you've **verified** is genuinely fixed.
+3. If every item is resolved on the current PR, add `Closes #<issue>` to that PR's body so the merge closes it; if some are deferred, check off only the resolved ones and leave the issue open.
+4. For nits whose `warn` PR already auto-merged, address them in a follow-up PR that references `Closes #<issue>`.
+
+(Mirrors the fleet-wide convention in `~/.claude/CLAUDE.md`.)
+
 ## Gotchas
 
 - **ESM + NodeNext**: imports must use `.js` extensions even for `.ts` source files (e.g. `import { SplitwiseClient } from './client.js'`).
-- **Rate limiting**: 429 retries once after 2s, then throws `Rate limited by Splitwise API`. Splitwise rate limits are undocumented.
-- **Startup validation**: `SplitwiseClient` throws immediately if `SPLITWISE_API_KEY` is missing, blank, `"undefined"`, `"null"`, or an unsubstituted `${...}` placeholder.
+- **Rate limiting**: 429 retries once after 2s (via `createApiClient`'s `retry`), then throws `Rate limited by Splitwise API`. Splitwise rate limits are undocumented.
+- **Deferred config error**: `SplitwiseClient` does **not** throw at startup when `SPLITWISE_API_KEY` is missing/blank/`"undefined"`/`"null"`/unsubstituted `${...}` — it stores the error and re-raises it on the first tool request. This lets the server boot and answer the host's install-time `tools/list` smoke test without a key. A 401 from the API surfaces as `SPLITWISE_API_KEY is invalid or missing`.
 - **Build before run**: `dist/` must exist. `npm run build` runs `tsc` (→ `dist/index.js` + per-file output) and then `esbuild` bundling to `dist/bundle.js` (the mcpb manifest entry point).
 - **`cost` as strings**: Splitwise wants decimal strings (`"25.00"`), not numbers — `paid_share`/`owed_share` likewise.
 - **`split_equally` vs `users[]`**: mutually exclusive in `sw_create_expense` / `sw_update_expense`. `buildExpenseBody` throws if both are passed. Custom splits are flattened into `users__N__user_id` / `..._paid_share` / `..._owed_share` keys.
