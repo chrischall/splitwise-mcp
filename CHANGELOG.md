@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.10](https://github.com/chrischall/splitwise-mcp/compare/v2.0.9...v2.0.10) (2026-07-05)
+
+
+### Documentation
+
+* refresh CLAUDE.md for mcp-utils architecture + auto-review follow-ups ([#62](https://github.com/chrischall/splitwise-mcp/issues/62)) ([ad2a1da](https://github.com/chrischall/splitwise-mcp/commit/ad2a1daae5ba5bdf2c88d2e2c55ce4cde397a7da))
+* require Conventional Commit PR titles for release-please ([#58](https://github.com/chrischall/splitwise-mcp/issues/58)) ([646a633](https://github.com/chrischall/splitwise-mcp/commit/646a633b016580f2a27dfb714157754ace4fe133))
+
 ## [2.0.9](https://github.com/chrischall/splitwise-mcp/compare/v2.0.8...v2.0.9) (2026-06-13)
 
 
