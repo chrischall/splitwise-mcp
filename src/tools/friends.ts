@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { textResult } from '@chrischall/mcp-utils';
 import { client } from '../client.js';
+import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
 export function registerFriendTools(server: McpServer): void {
   server.registerTool('sw_list_friends', {
@@ -13,27 +14,34 @@ export function registerFriendTools(server: McpServer): void {
   });
 
   server.registerTool('sw_create_friend', {
-    description: 'Add a Splitwise friend by email.',
+    description: 'Add a Splitwise friend by email (sends them an invite). Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it adds the friend.',
+    annotations: { destructiveHint: true },
     inputSchema: {
       user_email: z.string().describe('Email of the user to add as a friend'),
       user_first_name: z.string().describe('First name of the user').optional(),
       user_last_name: z.string().describe('Last name of the user').optional(),
+      confirm: schemaConfirm,
     },
-  }, async ({ user_email, user_first_name, user_last_name }) => {
+  }, async ({ user_email, user_first_name, user_last_name, confirm }) => {
     const body: Record<string, unknown> = { user_email };
     if (user_first_name !== undefined) body.user_first_name = user_first_name;
     if (user_last_name !== undefined) body.user_last_name = user_last_name;
+    const gate = previewUnlessConfirmed(confirm, `Add ${user_email} as a Splitwise friend`, 'POST', '/create_friend', body);
+    if (gate) return gate;
     const data = await client.request('POST', '/create_friend', body);
     return textResult(data);
   });
 
   server.registerTool('sw_delete_friend', {
-    description: 'Remove a Splitwise friendship by user id.',
+    description: 'Remove a Splitwise friendship by user id. Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it removes the friendship.',
     annotations: { destructiveHint: true },
     inputSchema: {
       id: z.number().describe('User ID of the friend to remove'),
+      confirm: schemaConfirm,
     },
-  }, async ({ id }) => {
+  }, async ({ id, confirm }) => {
+    const gate = previewUnlessConfirmed(confirm, `Remove Splitwise friendship with user ${id}`, 'POST', `/delete_friend/${id}`);
+    if (gate) return gate;
     const data = await client.request('POST', `/delete_friend/${id}`);
     return textResult(data);
   });

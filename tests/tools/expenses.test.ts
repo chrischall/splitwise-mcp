@@ -70,7 +70,7 @@ describe('sw_get_expense', () => {
 describe('sw_create_expense', () => {
   it('sends equal-split body with split_equally:true', async () => {
     mockRequest.mockResolvedValue({ expenses: [{}] });
-    await harness.callTool('sw_create_expense', {
+    await harness.callTool('sw_create_expense', { confirm: true,
       group_id: 1,
       description: 'Dinner',
       cost: '50.00',
@@ -86,7 +86,7 @@ describe('sw_create_expense', () => {
 
   it('flattens users array for custom split', async () => {
     mockRequest.mockResolvedValue({ expenses: [{}] });
-    await harness.callTool('sw_create_expense', {
+    await harness.callTool('sw_create_expense', { confirm: true,
       group_id: 1,
       description: 'Dinner',
       cost: '50.00',
@@ -102,7 +102,7 @@ describe('sw_create_expense', () => {
   });
 
   it('throws if both split_equally and users are provided', async () => {
-    const result = await harness.callTool('sw_create_expense', {
+    const result = await harness.callTool('sw_create_expense', { confirm: true,
       group_id: 1, description: 'Dinner', cost: '50.00',
       split_equally: true,
       users: [{ user_id: 10, paid_share: '50.00', owed_share: '50.00' }],
@@ -113,7 +113,7 @@ describe('sw_create_expense', () => {
 
   it('includes optional fields when provided', async () => {
     mockRequest.mockResolvedValue({ expenses: [{}] });
-    await harness.callTool('sw_create_expense', {
+    await harness.callTool('sw_create_expense', { confirm: true,
       group_id: 1,
       description: 'Dinner',
       cost: '50.00',
@@ -134,7 +134,7 @@ describe('sw_create_expense', () => {
 describe('sw_update_expense', () => {
   it('calls POST /update_expense/{id} with provided fields only', async () => {
     mockRequest.mockResolvedValue({ expense: {} });
-    await harness.callTool('sw_update_expense', {
+    await harness.callTool('sw_update_expense', { confirm: true,
       expense_id: 42,
       description: 'Updated dinner',
       cost: '60.00',
@@ -146,7 +146,7 @@ describe('sw_update_expense', () => {
   });
 
   it('throws if both split_equally and users provided in update', async () => {
-    const result = await harness.callTool('sw_update_expense', {
+    const result = await harness.callTool('sw_update_expense', { confirm: true,
       expense_id: 42,
       split_equally: true,
       users: [{ user_id: 1, paid_share: '50.00', owed_share: '50.00' }],
@@ -159,7 +159,7 @@ describe('sw_update_expense', () => {
 describe('sw_delete_expense', () => {
   it('calls POST /delete_expense/{id}', async () => {
     mockRequest.mockResolvedValue({ success: true });
-    const result = await harness.callTool('sw_delete_expense', { id: 42 });
+    const result = await harness.callTool('sw_delete_expense', { confirm: true, id: 42 });
     expect(mockRequest).toHaveBeenCalledWith('POST', '/delete_expense/42');
     expect((result.content[0] as { text: string }).text).toContain('true');
   });
@@ -171,5 +171,18 @@ describe('sw_undelete_expense', () => {
     const result = await harness.callTool('sw_undelete_expense', { id: 42 });
     expect(mockRequest).toHaveBeenCalledWith('POST', '/undelete_expense/42');
     expect(result.isError).toBeFalsy();
+  });
+});
+
+describe('confirm-gate', () => {
+  it('sw_delete_expense without confirm returns a dry-run preview and makes NO network call', async () => {
+    const result = await harness.callTool('sw_delete_expense', { id: 5 });
+    expect(mockRequest).not.toHaveBeenCalled();
+    expect(JSON.parse(result.content[0].text as string).dryRun).toBe(true);
+  });
+
+  it('sw_create_expense with confirm:true makes the network call', async () => {
+    await harness.callTool('sw_create_expense', { confirm: true, group_id: 0, description: 'x', cost: '1.00', split_equally: true });
+    expect(mockRequest).toHaveBeenCalledWith('POST', '/create_expense', expect.any(Object));
   });
 });

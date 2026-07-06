@@ -65,7 +65,7 @@ describe('sw_get_comments', () => {
 describe('sw_create_comment', () => {
   it('calls POST /create_comment with expense_id and content', async () => {
     mockRequest.mockResolvedValue({ comment: {} });
-    const result = await harness.callTool('sw_create_comment', { expense_id: 55, content: 'Nice expense!' });
+    const result = await harness.callTool('sw_create_comment', { confirm: true, expense_id: 55, content: 'Nice expense!' });
     expect(mockRequest).toHaveBeenCalledWith('POST', '/create_comment', {
       expense_id: 55,
       content: 'Nice expense!',
@@ -77,7 +77,7 @@ describe('sw_create_comment', () => {
 describe('sw_delete_comment', () => {
   it('calls POST /delete_comment/12', async () => {
     mockRequest.mockResolvedValue({ success: true });
-    const result = await harness.callTool('sw_delete_comment', { id: 12 });
+    const result = await harness.callTool('sw_delete_comment', { confirm: true, id: 12 });
     expect(mockRequest).toHaveBeenCalledWith('POST', '/delete_comment/12');
     expect(result.isError).toBeFalsy();
   });
