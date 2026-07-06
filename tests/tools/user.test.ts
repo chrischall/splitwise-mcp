@@ -43,13 +43,13 @@ describe('user tools', () => {
   describe('sw_update_user', () => {
     it('calls POST /update_user/99 with only provided fields', async () => {
       mockRequest.mockResolvedValue({ user: { id: 99 } });
-      await harness.callTool('sw_update_user', { id: 99, first_name: 'Chris' });
+      await harness.callTool('sw_update_user', { confirm: true, id: 99, first_name: 'Chris' });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/update_user/99', { first_name: 'Chris' });
     });
 
     it('sends all provided optional fields', async () => {
       mockRequest.mockResolvedValue({ user: {} });
-      await harness.callTool('sw_update_user', {
+      await harness.callTool('sw_update_user', { confirm: true,
         id: 99,
         first_name: 'Chris',
         last_name: 'Smith',
@@ -68,7 +68,7 @@ describe('user tools', () => {
 
     it('does not send undefined optional fields', async () => {
       mockRequest.mockResolvedValue({ user: {} });
-      await harness.callTool('sw_update_user', { id: 99 });
+      await harness.callTool('sw_update_user', { confirm: true, id: 99 });
       const [, , body] = mockRequest.mock.calls[0];
       expect(body).toEqual({});
     });

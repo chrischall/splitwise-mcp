@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { textResult } from '@chrischall/mcp-utils';
 import { client } from '../client.js';
+import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
 export function registerUserTools(server: McpServer): void {
   server.registerTool('sw_get_current_user', {
@@ -33,8 +34,9 @@ export function registerUserTools(server: McpServer): void {
       password: z.string().optional(),
       locale: z.string().optional(),
       default_currency: z.string().optional(),
+      confirm: schemaConfirm,
     },
-  }, async ({ id, first_name, last_name, email, password, locale, default_currency }) => {
+  }, async ({ id, first_name, last_name, email, password, locale, default_currency, confirm }) => {
     const body: Record<string, unknown> = {};
     if (first_name !== undefined) body.first_name = first_name;
     if (last_name !== undefined) body.last_name = last_name;
@@ -42,6 +44,10 @@ export function registerUserTools(server: McpServer): void {
     if (password !== undefined) body.password = password;
     if (locale !== undefined) body.locale = locale;
     if (default_currency !== undefined) body.default_currency = default_currency;
+    // Never echo the password in the dry-run preview.
+    const previewBody = { ...body, ...(password !== undefined ? { password: '[hidden]' } : {}) };
+    const gate = previewUnlessConfirmed(confirm, `Update current Splitwise user ${id} profile`, 'POST', `/update_user/${id}`, previewBody);
+    if (gate) return gate;
     const data = await client.request('POST', `/update_user/${id}`, body);
     return textResult(data);
   });

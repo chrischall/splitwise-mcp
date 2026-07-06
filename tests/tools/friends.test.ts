@@ -31,14 +31,14 @@ describe('friend tools', () => {
   describe('sw_create_friend', () => {
     it('calls POST /create_friend with required user_email', async () => {
       mockRequest.mockResolvedValue({ friends: [] });
-      const result = await harness.callTool('sw_create_friend', { user_email: 'new@example.com' });
+      const result = await harness.callTool('sw_create_friend', { confirm: true, user_email: 'new@example.com' });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/create_friend', { user_email: 'new@example.com' });
       expect(result.isError).toBeFalsy();
     });
 
     it('includes optional name fields when provided', async () => {
       mockRequest.mockResolvedValue({ friends: [] });
-      await harness.callTool('sw_create_friend', {
+      await harness.callTool('sw_create_friend', { confirm: true,
         user_email: 'new@example.com',
         user_first_name: 'Jane',
         user_last_name: 'Doe',
@@ -52,7 +52,7 @@ describe('friend tools', () => {
 
     it('does not send undefined optional fields', async () => {
       mockRequest.mockResolvedValue({ friends: [] });
-      await harness.callTool('sw_create_friend', { user_email: 'new@example.com' });
+      await harness.callTool('sw_create_friend', { confirm: true, user_email: 'new@example.com' });
       const [, , body] = mockRequest.mock.calls[0];
       expect(body).not.toHaveProperty('user_first_name');
       expect(body).not.toHaveProperty('user_last_name');
@@ -62,7 +62,7 @@ describe('friend tools', () => {
   describe('sw_delete_friend', () => {
     it('calls POST /delete_friend/7', async () => {
       mockRequest.mockResolvedValue({ success: true });
-      const result = await harness.callTool('sw_delete_friend', { id: 7 });
+      const result = await harness.callTool('sw_delete_friend', { confirm: true, id: 7 });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/delete_friend/7');
       expect(result.isError).toBeFalsy();
     });

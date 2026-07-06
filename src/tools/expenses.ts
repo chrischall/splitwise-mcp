@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { textResult, buildQueryString } from '@chrischall/mcp-utils';
 import { client } from '../client.js';
+import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
 interface UserShare {
   user_id: number;
@@ -21,10 +22,12 @@ export function flattenUsers(users: UserShare[]): Record<string, unknown> {
 }
 
 function buildExpenseBody(args: Record<string, unknown>): Record<string, unknown> {
-  const { split_equally, users, expense_id: _id, ...rest } = args as {
+  // `confirm` is a tool-gate flag, not part of the Splitwise expense payload.
+  const { split_equally, users, expense_id: _id, confirm: _confirm, ...rest } = args as {
     split_equally?: boolean;
     users?: UserShare[];
     expense_id?: number;
+    confirm?: boolean;
     [key: string]: unknown;
   };
 
@@ -101,9 +104,12 @@ export function registerExpenseTools(server: McpServer): void {
       date: z.string().describe('ISO 8601 datetime').optional(),
       category_id: z.number().describe('Category id from sw_get_categories').optional(),
       details: z.string().describe('Notes').optional(),
+      confirm: schemaConfirm,
     },
   }, async (args) => {
     const body = buildExpenseBody(args as Record<string, unknown>);
+    const gate = previewUnlessConfirmed(args.confirm, `Create a Splitwise expense "${args.description}" (${args.cost}) — notifies group members`, 'POST', '/create_expense', body);
+    if (gate) return gate;
     const data = await client.request('POST', '/create_expense', body);
     return textResult(data);
   });
@@ -120,21 +126,27 @@ export function registerExpenseTools(server: McpServer): void {
       date: z.string().optional(),
       category_id: z.number().optional(),
       details: z.string().optional(),
+      confirm: schemaConfirm,
     },
   }, async (args) => {
     const { expense_id } = args;
     const body = buildExpenseBody(args as Record<string, unknown>);
+    const gate = previewUnlessConfirmed(args.confirm, `Update Splitwise expense ${expense_id} — notifies group members`, 'POST', `/update_expense/${expense_id}`, body);
+    if (gate) return gate;
     const data = await client.request('POST', `/update_expense/${expense_id}`, body);
     return textResult(data);
   });
 
   server.registerTool('sw_delete_expense', {
-    description: 'Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore.',
+    description: 'Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore. Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it deletes.',
     annotations: { destructiveHint: true },
     inputSchema: {
       id: z.number().describe('Expense ID to delete'),
+      confirm: schemaConfirm,
     },
-  }, async ({ id }) => {
+  }, async ({ id, confirm }) => {
+    const gate = previewUnlessConfirmed(confirm, `Soft-delete Splitwise expense ${id}`, 'POST', `/delete_expense/${id}`);
+    if (gate) return gate;
     const data = await client.request('POST', `/delete_expense/${id}`);
     return textResult(data);
   });
