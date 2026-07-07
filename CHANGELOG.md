@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.0.11](https://github.com/chrischall/splitwise-mcp/compare/v2.0.10...v2.0.11) (2026-07-07)
+
+
+### Bug Fixes
+
+* bump @chrischall/mcp-utils to 0.12.0 ([#76](https://github.com/chrischall/splitwise-mcp/issues/76)) ([e7de54b](https://github.com/chrischall/splitwise-mcp/commit/e7de54be4fbe7b00e71c2a7a1149e82b8753de76))
+* confirm-gate Splitwise write tools ([#72](https://github.com/chrischall/splitwise-mcp/issues/72)) ([a912419](https://github.com/chrischall/splitwise-mcp/commit/a9124197c5e0fd4e0d52f93d720a8f82027da6ec))
+* consistent confirm-gate descriptions/annotations for Splitwise writes ([#75](https://github.com/chrischall/splitwise-mcp/issues/75)) ([1c0a8c3](https://github.com/chrischall/splitwise-mcp/commit/1c0a8c372fae13972ac30cb023fef03212db1946))
+
+
+### Documentation
+
+* document first-party dependency-bump label exception ([#77](https://github.com/chrischall/splitwise-mcp/issues/77)) ([a31779a](https://github.com/chrischall/splitwise-mcp/commit/a31779a8d97330197fe0af6a61670164875a5d2a))
+
 ## [2.0.10](https://github.com/chrischall/splitwise-mcp/compare/v2.0.9...v2.0.10) (2026-07-05)
 
 

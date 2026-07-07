@@ -6,12 +6,12 @@
     "url": "https://github.com/chrischall/splitwise-mcp",
     "source": "github"
   },
-  "version": "2.0.10",
+  "version": "2.0.11",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "splitwise-mcp",
-      "version": "2.0.10",
+      "version": "2.0.11",
       "transport": {
         "type": "stdio"
       },
