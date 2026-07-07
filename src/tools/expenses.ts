@@ -93,7 +93,7 @@ export function registerExpenseTools(server: McpServer): void {
   });
 
   server.registerTool('sw_create_expense', {
-    description: 'Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string.',
+    description: 'Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it creates the expense.',
     inputSchema: {
       group_id: z.number().describe('Group to add expense to (use 0 for no group)'),
       description: z.string().describe('Short description of the expense'),
@@ -115,7 +115,7 @@ export function registerExpenseTools(server: McpServer): void {
   });
 
   server.registerTool('sw_update_expense', {
-    description: 'Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split).',
+    description: 'Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split). Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it updates the expense.',
     inputSchema: {
       expense_id: z.number().describe('ID of the expense to update'),
       description: z.string().optional(),

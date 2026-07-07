@@ -26,6 +26,7 @@ export function registerGroupTools(server: McpServer): void {
 
   server.registerTool('sw_create_group', {
     description: 'Create a new Splitwise group.',
+    annotations: { destructiveHint: true },
     inputSchema: {
       name: z.string().describe('Group name'),
       group_type: z.enum(['apartment', 'house', 'trip', 'other']).describe('Type of group').optional(),
