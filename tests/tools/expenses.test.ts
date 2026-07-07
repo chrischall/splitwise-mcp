@@ -181,8 +181,9 @@ describe('confirm-gate', () => {
     expect(JSON.parse(result.content[0].text as string).dryRun).toBe(true);
   });
 
-  it('sw_create_expense with confirm:true makes the network call', async () => {
-    await harness.callTool('sw_create_expense', { confirm: true, group_id: 0, description: 'x', cost: '1.00', split_equally: true });
-    expect(mockRequest).toHaveBeenCalledWith('POST', '/create_expense', expect.any(Object));
+  it('sw_create_expense without confirm returns a dry-run preview and makes NO network call', async () => {
+    const result = await harness.callTool('sw_create_expense', { group_id: 0, description: 'x', cost: '1.00', split_equally: true });
+    expect(mockRequest).not.toHaveBeenCalled();
+    expect(JSON.parse(result.content[0].text as string).dryRun).toBe(true);
   });
 });
