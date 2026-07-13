@@ -63,7 +63,8 @@ Tests live in `tests/` (vitest). No real API calls — `fetch` is mocked. `tests
 .mcp.json           # MCP server config referenced by plugin.json
 manifest.json       # mcpb manifest (display name, user_config, tool list)
 server.json         # MCP registry submission (modelcontextprotocol/registry)
-SKILL.md            # Claude Code skill — teaches Claude when/how to use the tools
+skills/splitwise-mcp/
+  SKILL.md          # Claude Code skill — teaches Claude when/how to use the tools
 ```
 
 ## Publishing constraints
