@@ -16,6 +16,6 @@
     "mcp",
     "finance"
   ],
-  "skills": "./SKILL.md",
+  "skills": "./skills/",
   "mcp": "./.mcp.json"
 }
