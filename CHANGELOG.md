@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.12](https://github.com/chrischall/splitwise-mcp/compare/v2.0.11...v2.0.12) (2026-07-13)
+
+
+### Bug Fixes
+
+* **plugin:** move SKILL.md into skills/ directory so plugin skills load ([#81](https://github.com/chrischall/splitwise-mcp/issues/81)) ([067a811](https://github.com/chrischall/splitwise-mcp/commit/067a811d48494a93f3bbc7e59e6eb5173701d1b6))
+
 ## [2.0.11](https://github.com/chrischall/splitwise-mcp/compare/v2.0.10...v2.0.11) (2026-07-07)
 
 

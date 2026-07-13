@@ -13,7 +13,7 @@ import { registerUtilityTools } from './tools/utilities.js';
 // the configuration error only surfaces on the first tool call.
 await runMcp({
   name: 'splitwise-mcp',
-  version: '2.0.11', // x-release-please-version
+  version: '2.0.12', // x-release-please-version
   banner:
     '[splitwise-mcp] This project was developed and is maintained by AI (Claude Sonnet 4.6). Use at your own discretion.',
   tools: [
