@@ -48,6 +48,14 @@ jobs:
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
 
+      # mcp-publish looks for a root-level SKILL.md for the .skill release
+      # artifact and the ClawHub publish. The plugin skill lives at
+      # skills/splitwise-mcp/SKILL.md (Claude Code plugin layout), so stage a
+      # copy where the action expects it. .mcpbignore lists SKILL.md, keeping
+      # the staged copy out of the .mcpb bundle.
+      - name: Stage skill for mcp-publish
+        run: cp skills/splitwise-mcp/SKILL.md SKILL.md
+
       - uses: chrischall/workflows/.github/actions/mcp-publish@main
         with:
           version: ${{ needs.release-please.outputs.version }}

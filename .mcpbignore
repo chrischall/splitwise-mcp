@@ -42,6 +42,8 @@ plugin.json
 .claude-plugin/
 .mcp.json
 skills/
+# CI stages a root-level SKILL.md copy for mcp-publish before packing
+SKILL.md
 
 # Companion native bits (e.g. Chrome extension) are installed separately
 extension/
