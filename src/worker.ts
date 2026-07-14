@@ -23,7 +23,7 @@ import { registerUtilityTools } from './tools/utilities.js';
 // not a structural write-mode gate.
 const { Agent, handler } = createConnector<SplitwiseProps, SplitwiseClient>({
   name: 'splitwise-mcp',
-  version: '2.0.12', // x-release-please-version
+  version: '2.1.0', // x-release-please-version
   auth: splitwiseAuth,
   buildClient: (props) => new SplitwiseClient({ apiKey: props.apiKey }),
   // Keep the SAME order as src/index.ts.
