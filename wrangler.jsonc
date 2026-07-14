@@ -12,9 +12,10 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SplitwiseMcpAgent"] }],
   // splitwise-connector's own OAuth token store (title: splitwise-connector-oauth).
   // Kept separate from any other connector's OAUTH_KV so their OAuth grants/tokens
-  // never cross-wire. To stand up a fresh deployment, create your own
-  // (wrangler kv namespace create OAUTH_KV) and replace this placeholder id.
-  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "REPLACE_WITH_OAUTH_KV_NAMESPACE_ID" }],
+  // never cross-wire. To stand up a fresh deployment in a different account,
+  // create your own (wrangler kv namespace create splitwise-connector-oauth) and
+  // replace this id.
+  "kv_namespaces": [{ "binding": "OAUTH_KV", "id": "5dac4ba6acd54b61b6bafe7ae0bd383d" }],
   // Production custom domain (matches untappd-mcp's connector.untappd.nullnet.app
   // and ofw-mcp's connector.ofw.nullnet.app). The zone must be in the deploying
   // account's Cloudflare; wrangler provisions the hostname on deploy. Remove this
