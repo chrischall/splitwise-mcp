@@ -13,7 +13,7 @@ afterAll(async () => { if (harness) await harness.close(); });
 
 describe('user tools', () => {
   it('setup', async () => {
-    harness = await createTestHarness((server) => registerUserTools(server));
+    harness = await createTestHarness((server) => registerUserTools(server, client));
   });
 
   describe('sw_get_current_user', () => {

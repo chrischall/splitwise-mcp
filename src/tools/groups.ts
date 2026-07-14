@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { textResult } from '@chrischall/mcp-utils';
-import { client } from '../client.js';
+import type { SplitwiseClient } from '../client.js';
 import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
-export function registerGroupTools(server: McpServer): void {
+export function registerGroupTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool('sw_list_groups', {
     description: 'List all Splitwise groups the current user belongs to. Returns id, name, and members for each group. Use this to resolve a group name to its id.',
     annotations: { readOnlyHint: true },

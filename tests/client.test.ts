@@ -31,6 +31,29 @@ describe('SplitwiseClient', () => {
     }
   });
 
+  it('uses an injected apiKey over the environment (hosted per-user seam)', async () => {
+    // The constructor seam a Cloudflare Worker connector uses: build one client
+    // per request with that user's key injected, bypassing the process env.
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ user: { id: 1 } }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const client = new SplitwiseClient({ apiKey: 'injected-user-key' });
+    await client.request('GET', '/get_current_user');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://secure.splitwise.com/api/v3.0/get_current_user',
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer injected-user-key',
+        }),
+      })
+    );
+  });
+
   it('sends Authorization header with Bearer token', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

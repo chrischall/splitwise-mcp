@@ -13,7 +13,7 @@ afterAll(async () => { if (harness) await harness.close(); });
 
 describe('expense tools', () => {
   it('setup', async () => {
-    harness = await createTestHarness((server) => registerExpenseTools(server));
+    harness = await createTestHarness((server) => registerExpenseTools(server, client));
   });
 
   it('has all 6 expense tools', async () => {

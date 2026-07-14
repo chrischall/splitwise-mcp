@@ -13,7 +13,7 @@ afterAll(async () => { if (harness) await harness.close(); });
 
 describe('group tools', () => {
   it('setup', async () => {
-    harness = await createTestHarness((server) => registerGroupTools(server));
+    harness = await createTestHarness((server) => registerGroupTools(server, client));
   });
 
   it('lists all 7 group tools', async () => {

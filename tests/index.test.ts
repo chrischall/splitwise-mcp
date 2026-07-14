@@ -1,4 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
+import { client } from '../src/client.js';
 import { registerUserTools } from '../src/tools/user.js';
 import { registerGroupTools } from '../src/tools/groups.js';
 import { registerFriendTools } from '../src/tools/friends.js';
@@ -18,11 +19,11 @@ describe('tool registry', () => {
 
   it('includes all 25 expected tools', async () => {
     harness = await createTestHarness((server) => {
-      registerUserTools(server);
-      registerGroupTools(server);
-      registerFriendTools(server);
-      registerExpenseTools(server);
-      registerUtilityTools(server);
+      registerUserTools(server, client);
+      registerGroupTools(server, client);
+      registerFriendTools(server, client);
+      registerExpenseTools(server, client);
+      registerUtilityTools(server, client);
     });
 
     const tools = await harness.listTools();
