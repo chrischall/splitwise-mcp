@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.1.0](https://github.com/chrischall/splitwise-mcp/compare/v2.0.12...v2.1.0) (2026-07-14)
+
+
+### Features
+
+* add hosted Cloudflare Worker connector (full-write) ([#86](https://github.com/chrischall/splitwise-mcp/issues/86)) ([e98c3bb](https://github.com/chrischall/splitwise-mcp/commit/e98c3bb87943f6bfacd5e744f6e06707436af789))
+
+
+### Bug Fixes
+
+* guard client.ts .env load so the Worker starts + wire OAUTH_KV id ([#88](https://github.com/chrischall/splitwise-mcp/issues/88)) ([6e0e34e](https://github.com/chrischall/splitwise-mcp/commit/6e0e34ea65565c5a38f78d27bc778172b41b5df6))
+
+
+### Refactor
+
+* pass client into tool registrars (transport-neutral) ([#83](https://github.com/chrischall/splitwise-mcp/issues/83)) ([2a9cb11](https://github.com/chrischall/splitwise-mcp/commit/2a9cb11fe9954b34666f689eb7794f3511181daf))
+
 ## [2.0.12](https://github.com/chrischall/splitwise-mcp/compare/v2.0.11...v2.0.12) (2026-07-13)
 
 
