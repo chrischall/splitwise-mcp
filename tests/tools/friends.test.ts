@@ -13,7 +13,7 @@ afterAll(async () => { if (harness) await harness.close(); });
 
 describe('friend tools', () => {
   it('setup', async () => {
-    harness = await createTestHarness((server) => registerFriendTools(server));
+    harness = await createTestHarness((server) => registerFriendTools(server, client));
   });
 
   describe('sw_list_friends', () => {

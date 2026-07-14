@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { textResult, buildQueryString } from '@chrischall/mcp-utils';
-import { client } from '../client.js';
+import type { SplitwiseClient } from '../client.js';
 import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
-export function registerUtilityTools(server: McpServer): void {
+export function registerUtilityTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool('sw_get_notifications', {
     description: 'Get recent Splitwise activity notifications for the current user.',
     annotations: { readOnlyHint: true },

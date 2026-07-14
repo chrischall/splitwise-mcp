@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { textResult } from '@chrischall/mcp-utils';
-import { client } from '../client.js';
+import type { SplitwiseClient } from '../client.js';
 import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
-export function registerFriendTools(server: McpServer): void {
+export function registerFriendTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool('sw_list_friends', {
     description: "List all Splitwise friends with their id, first_name, last_name, and email. Use this to resolve a friend's name to a user_id before adding them to a group or building a custom expense split.",
     annotations: { readOnlyHint: true },

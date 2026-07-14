@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { textResult } from '@chrischall/mcp-utils';
-import { client } from '../client.js';
+import type { SplitwiseClient } from '../client.js';
 import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
-export function registerUserTools(server: McpServer): void {
+export function registerUserTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool('sw_get_current_user', {
     description: "Get the authenticated Splitwise user's profile (id, first_name, last_name, email). Use the returned id when building custom expense splits.",
     annotations: { readOnlyHint: true },

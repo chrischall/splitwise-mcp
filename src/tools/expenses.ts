@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { textResult, buildQueryString } from '@chrischall/mcp-utils';
-import { client } from '../client.js';
+import type { SplitwiseClient } from '../client.js';
 import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
 interface UserShare {
@@ -52,7 +52,7 @@ const userShareSchema = z.object({
   owed_share: z.string().describe('Amount this user owes, e.g. "12.50"'),
 });
 
-export function registerExpenseTools(server: McpServer): void {
+export function registerExpenseTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool('sw_list_expenses', {
     description: 'List or search Splitwise expenses. All filters are optional. Use group_id to filter by group, dated_after/dated_before for date ranges.',
     annotations: { readOnlyHint: true },

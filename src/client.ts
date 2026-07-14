@@ -20,12 +20,18 @@ export class SplitwiseClient {
    * Defer the config error so the server can still start (and respond to the
    * host's install-time smoke test) when SPLITWISE_API_KEY isn't set yet.
    * Tool calls re-raise the error at request time.
+   *
+   * Optional constructor seam: a hosted per-user deployment (e.g. a Cloudflare
+   * Worker "remote connector") builds one client per request with that user's
+   * `apiKey` injected. The stdio path passes no options, so the key resolves
+   * from the environment exactly as before — byte-for-byte identical behaviour.
    */
-  constructor() {
-    // readEnvVar trims whitespace and treats blank/`undefined`/`null`/`${...}`
-    // placeholder values as unset — defends against MCP hosts that pass
-    // .mcp.json env blocks through unexpanded.
-    const key = readEnvVar('SPLITWISE_API_KEY');
+  constructor(opts?: { apiKey?: string }) {
+    // Injected apiKey (hosted per-user path) takes precedence; otherwise fall
+    // back to the env var. readEnvVar trims whitespace and treats
+    // blank/`undefined`/`null`/`${...}` placeholder values as unset — defends
+    // against MCP hosts that pass .mcp.json env blocks through unexpanded.
+    const key = opts?.apiKey ?? readEnvVar('SPLITWISE_API_KEY');
     if (!key) {
       this.apiKey = null;
       this.configError = new Error('SPLITWISE_API_KEY environment variable is required');
