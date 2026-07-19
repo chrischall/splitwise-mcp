@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.2](https://github.com/chrischall/splitwise-mcp/compare/v2.1.1...v2.1.2) (2026-07-19)
+
+
+### Bug Fixes
+
+* **deps:** move to workers-oauth-provider 0.8.x and mcp-connector 1.0.0 ([#94](https://github.com/chrischall/splitwise-mcp/issues/94)) ([fcd874d](https://github.com/chrischall/splitwise-mcp/commit/fcd874dbaf8988cab257882221e00617aed1a03c))
+
 ## [2.1.1](https://github.com/chrischall/splitwise-mcp/compare/v2.1.0...v2.1.1) (2026-07-19)
 
 
