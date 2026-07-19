@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.1.1](https://github.com/chrischall/splitwise-mcp/compare/v2.1.0...v2.1.1) (2026-07-19)
+
+
+### Bug Fixes
+
+* **ci:** run the Workers test pool in CI ([#91](https://github.com/chrischall/splitwise-mcp/issues/91)) ([d66dfd2](https://github.com/chrischall/splitwise-mcp/commit/d66dfd229c6ed11665628ebc4fa70160d023a24e))
+
+
+### Documentation
+
+* replace duplicated fleet policy with a pointer ([#89](https://github.com/chrischall/splitwise-mcp/issues/89)) ([b3656db](https://github.com/chrischall/splitwise-mcp/commit/b3656db7305ff6d81a861cb01d1c219856ead474))
+
 ## [2.1.0](https://github.com/chrischall/splitwise-mcp/compare/v2.0.12...v2.1.0) (2026-07-14)
 
 

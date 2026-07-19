@@ -18,7 +18,7 @@ import { registerUtilityTools } from './tools/utilities.js';
 // per-request client into the same registrars instead of this singleton.
 await runMcp({
   name: 'splitwise-mcp',
-  version: '2.1.0', // x-release-please-version
+  version: '2.1.1', // x-release-please-version
   deps: client,
   banner:
     '[splitwise-mcp] This project was developed and is maintained by AI (Claude Sonnet 4.6). Use at your own discretion.',
