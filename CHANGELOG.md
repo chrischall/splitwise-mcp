@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.3](https://github.com/chrischall/splitwise-mcp/compare/v2.1.2...v2.1.3) (2026-07-20)
+
+
+### Documentation
+
+* correct the connector deploy runbook ([#99](https://github.com/chrischall/splitwise-mcp/issues/99)) ([bcb32cc](https://github.com/chrischall/splitwise-mcp/commit/bcb32cc66f8e4955b85fd8e7d06e35658471267e))
+
 ## [2.1.2](https://github.com/chrischall/splitwise-mcp/compare/v2.1.1...v2.1.2) (2026-07-19)
 
 
