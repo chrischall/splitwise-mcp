@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.4](https://github.com/chrischall/splitwise-mcp/compare/v2.1.3...v2.1.4) (2026-07-27)
+
+
+### Bug Fixes
+
+* **deps:** require @chrischall/mcp-connector &gt;=1.1.1 ([#107](https://github.com/chrischall/splitwise-mcp/issues/107)) ([d47c31f](https://github.com/chrischall/splitwise-mcp/commit/d47c31fc3ba7c3a0ecf7cf51f5a8753cf0266f05))
+
 ## [2.1.3](https://github.com/chrischall/splitwise-mcp/compare/v2.1.2...v2.1.3) (2026-07-20)
 
 
