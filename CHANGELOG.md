@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.5](https://github.com/chrischall/splitwise-mcp/compare/v2.1.4...v2.1.5) (2026-07-27)
+
+
+### Documentation
+
+* correct the version-location count and the tool-registrar signature ([#112](https://github.com/chrischall/splitwise-mcp/issues/112)) ([bf086b5](https://github.com/chrischall/splitwise-mcp/commit/bf086b59f71128557e86b0144ff497e80fabc2a3))
+
 ## [2.1.4](https://github.com/chrischall/splitwise-mcp/compare/v2.1.3...v2.1.4) (2026-07-27)
 
 
