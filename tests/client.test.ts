@@ -32,7 +32,7 @@ describe('SplitwiseClient', () => {
   });
 
   it('uses an injected apiKey over the environment (hosted per-user seam)', async () => {
-    // The constructor seam a Cloudflare Worker connector uses: build one client
+    // The constructor seam a hosted per-user deployment uses: build one client
     // per request with that user's key injected, bypassing the process env.
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

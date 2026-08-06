@@ -5,9 +5,9 @@ import { loadDotenvSafely, readEnvVar, createApiClient, type ApiClient } from '@
 // Load .env for local dev; silently skip if dotenv is unavailable (e.g. mcpb
 // bundle). `loadDotenvSafely` swallows a missing dotenv module and never lets
 // .env override a host-provided value.
-// The try/catch guards the Cloudflare Worker runtime, where `import.meta.url`
-// is undefined and `fileURLToPath(undefined)` would throw at module init
-// (Worker startup validation) — there is no filesystem / .env to load there.
+// The try/catch guards a runtime where `import.meta.url` is undefined and
+// `fileURLToPath(undefined)` would throw at module init — there is no
+// filesystem / .env to load in one of those.
 try {
   const dir = dirname(fileURLToPath(import.meta.url));
   await loadDotenvSafely({ path: join(dir, '..', '.env'), override: false });
@@ -28,10 +28,10 @@ export class SplitwiseClient {
    * host's install-time smoke test) when SPLITWISE_API_KEY isn't set yet.
    * Tool calls re-raise the error at request time.
    *
-   * Optional constructor seam: a hosted per-user deployment (e.g. a Cloudflare
-   * Worker "remote connector") builds one client per request with that user's
-   * `apiKey` injected. The stdio path passes no options, so the key resolves
-   * from the environment exactly as before — byte-for-byte identical behaviour.
+   * Optional constructor seam: a hosted per-user deployment builds one client
+   * per request with that user's `apiKey` injected. The stdio path passes no
+   * options, so the key resolves from the environment exactly as before —
+   * byte-for-byte identical behaviour.
    */
   constructor(opts?: { apiKey?: string }) {
     // Injected apiKey (hosted per-user path) takes precedence; otherwise fall
