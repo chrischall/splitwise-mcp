@@ -83,8 +83,7 @@
           "path": ".claude-plugin/marketplace.json",
           "jsonpath": "$.metadata.version"
         },
-        "src/index.ts",
-        "src/worker.ts"
+        "src/index.ts"
       ]
     }
   }
