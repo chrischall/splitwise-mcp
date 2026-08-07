@@ -40,7 +40,7 @@ src/
                   #   sw_get_comments, sw_create_comment, sw_delete_comment
 ```
 
-Each tool file exports a `register<Domain>Tools(server, client)` function that calls `server.registerTool(name, { description, annotations, inputSchema }, handler)` (high-level `McpServer` API with zod schemas). The `SplitwiseClient` is INJECTED as the second argument rather than imported as a module singleton — the hosted Worker builds one client per authenticated user, which a singleton cannot express. `index.ts` passes the register functions to `runMcp`, which builds the `McpServer`, calls each, and connects the stdio transport.
+Each tool file exports a `register<Domain>Tools(server, client)` function that calls `server.registerTool(name, { description, annotations, inputSchema }, handler)` (high-level `McpServer` API with zod schemas). The `SplitwiseClient` is INJECTED as the second argument rather than imported as a module singleton — a hosted per-user deployment builds one client per authenticated user, which a singleton cannot express. `index.ts` passes the register functions to `runMcp`, which builds the `McpServer`, calls each, and connects the stdio transport.
 
 ## Environment
 
