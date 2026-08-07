@@ -14,8 +14,8 @@ import { registerUtilityTools } from './tools/utilities.js';
 // first request. That preserves the deferred-config-error pattern: the server
 // boots and answers the host's install-time tools/list smoke test even when
 // SPLITWISE_API_KEY is absent — the configuration error only surfaces on the
-// first tool call. A hosted per-user connector (a later task) injects its own
-// per-request client into the same registrars instead of this singleton.
+// first tool call. A hosted per-user deployment injects its own per-request
+// client into the same registrars instead of this singleton.
 await runMcp({
   name: 'splitwise-mcp',
   version: '2.1.5', // x-release-please-version

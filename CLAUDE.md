@@ -79,7 +79,7 @@ jq -r '.description | length' server.json
 
 ## Versioning
 
-Version appears in EIGHT places — all must match:
+Version appears in SEVEN places — all must match:
 
 1. `package.json` → `"version"`
 2. `package-lock.json` → bumped automatically by `npm version patch`
@@ -88,7 +88,6 @@ Version appears in EIGHT places — all must match:
 5. `server.json` → `"version"` and `packages[].version` (two entries)
 6. `.claude-plugin/plugin.json` → `"version"`
 7. `.claude-plugin/marketplace.json` → outer `metadata.version` and `plugins[].version`
-8. `src/worker.ts` → the `version: 'x.y.z'` literal on the line marked `// x-release-please-version`
 
 ### Important
 
