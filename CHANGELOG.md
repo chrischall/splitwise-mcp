@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.6](https://github.com/chrischall/splitwise-mcp/compare/v2.1.5...v2.1.6) (2026-08-07)
+
+
+### Refactor
+
+* **connector:** retire the standalone Cloudflare Worker connector ([#120](https://github.com/chrischall/splitwise-mcp/issues/120)) ([3bae684](https://github.com/chrischall/splitwise-mcp/commit/3bae6844991df70ea0793cbe190599cb781ea133))
+
 ## [2.1.5](https://github.com/chrischall/splitwise-mcp/compare/v2.1.4...v2.1.5) (2026-07-27)
 
 
