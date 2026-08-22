@@ -104,9 +104,12 @@ export class SplitwiseClient {
    * documented 401/429 messages.
    */
   private buildApiClient(baseUrl: string, authenticated: boolean): ApiClient {
+    // An anonymous asset origin isn't Splitwise, so name it accurately in
+    // errors rather than blaming the Splitwise API for a third party's 429.
+    const service = authenticated ? SERVICE_NAME : new URL(baseUrl).host;
     return createApiClient({
       baseUrl,
-      serviceName: SERVICE_NAME,
+      serviceName: service,
       retry: { count: 1, delayMs: 2000 },
       timeout: 30_000,
       ...(authenticated ? { getToken: () => this.requireKey() } : {}),
@@ -116,7 +119,7 @@ export class SplitwiseClient {
             ? 'SPLITWISE_API_KEY is invalid or missing'
             : 'The asset URL was rejected (401) — presigned URLs are short-lived, so re-run to get a fresh one',
         ),
-      onRateLimited: () => new Error('Rate limited by Splitwise API'),
+      onRateLimited: () => new Error(`Rate limited by ${authenticated ? 'Splitwise API' : service}`),
     });
   }
 

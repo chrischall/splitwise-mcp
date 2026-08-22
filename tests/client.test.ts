@@ -166,6 +166,40 @@ describe('SplitwiseClient', () => {
     );
   });
 
+  it('blames the asset host, not Splitwise, for a 429 on the anonymous path', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      headers: new Headers(),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+    vi.useFakeTimers();
+
+    const client = new SplitwiseClient();
+    const promise = client.fetchAsset('https://splitwise.s3.amazonaws.com/uploads/receipt.pdf?sig=x');
+    const assertion = expect(promise).rejects.toThrow('Rate limited by splitwise.s3.amazonaws.com');
+    await vi.advanceTimersByTimeAsync(2000);
+    await assertion;
+    vi.useRealTimers();
+  });
+
+  it('sends no Authorization header to a non-Splitwise asset host', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/pdf' }),
+      arrayBuffer: async () => new ArrayBuffer(4),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const client = new SplitwiseClient();
+    await client.fetchAsset('https://splitwise.s3.amazonaws.com/uploads/receipt.pdf?sig=x');
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(init.headers).not.toHaveProperty('Authorization');
+  });
+
   it('sends POST body as JSON', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

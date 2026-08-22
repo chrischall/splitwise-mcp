@@ -33,7 +33,8 @@
         "${__dirname}/dist/bundle.js"
       ],
       "env": {
-        "SPLITWISE_API_KEY": "${user_config.splitwise_api_key}"
+        "SPLITWISE_API_KEY": "${user_config.splitwise_api_key}",
+        "SPLITWISE_OUTPUT_DIR": "${user_config.splitwise_output_dir}"
       }
     }
   },
@@ -44,6 +45,12 @@
       "description": "Your Splitwise API key (found at splitwise.com/apps/api)",
       "required": true,
       "sensitive": true
+    },
+    "splitwise_output_dir": {
+      "type": "directory",
+      "title": "Receipt Download Directory",
+      "description": "Where sw_get_receipt saves downloaded receipts. Leave blank to use the working directory.",
+      "required": false
     }
   },
   "tools": [
