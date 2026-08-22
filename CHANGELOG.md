@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.2.0](https://github.com/chrischall/splitwise-mcp/compare/v2.1.6...v2.2.0) (2026-08-22)
+
+
+### Features
+
+* add sw_get_receipt for authenticated receipt downloads ([#129](https://github.com/chrischall/splitwise-mcp/issues/129)) ([cca49d7](https://github.com/chrischall/splitwise-mcp/commit/cca49d773c3ba69d981d3d5c01d00cf956aa3cf9))
+
+
+### Bug Fixes
+
+* harden receipt-asset error redaction and finish the [#129](https://github.com/chrischall/splitwise-mcp/issues/129) review follow-ups ([#132](https://github.com/chrischall/splitwise-mcp/issues/132)) ([4271176](https://github.com/chrischall/splitwise-mcp/commit/4271176c76f7c338da626abab842e2dbe3c9b84d))
+
 ## [2.1.6](https://github.com/chrischall/splitwise-mcp/compare/v2.1.5...v2.1.6) (2026-08-09)
 
 
