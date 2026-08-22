@@ -52,13 +52,18 @@ function parseAssetUrl(url: string): URL {
 }
 
 /**
- * Strip query strings out of an error message. A failed `fetchRaw` names the
- * path it requested, and a receipt URL's query carries a signed, capability-
- * bearing token that must not reach a tool result.
+ * Strip the asset URL's signed query string out of an error message. A failed
+ * `fetchRaw` names the path it requested, and a receipt URL's query carries a
+ * signed, capability-bearing token that must not reach a tool result.
+ *
+ * Matches the exact query bytes we sent rather than a pattern for the message
+ * shape: that keeps working whatever an upstream formatter does with the URL
+ * (relative path today, absolute URL tomorrow), and it can't mangle an error
+ * body that happens to contain a `?`.
  */
-function redactUrlQueries(err: unknown): unknown {
-  if (!(err instanceof Error)) return err;
-  const message = err.message.replace(/(\s\/\S*?)\?\S*/g, '$1?<redacted>');
+function redactAssetQuery(err: unknown, search: string): unknown {
+  if (!(err instanceof Error) || !search) return err;
+  const message = err.message.split(search).join('?<redacted>');
   if (message === err.message) return err;
   return err instanceof ApiError ? new ApiError(err.status, message) : new Error(message);
 }
@@ -104,9 +109,12 @@ export class SplitwiseClient {
    * documented 401/429 messages.
    */
   private buildApiClient(baseUrl: string, authenticated: boolean): ApiClient {
+    // An anonymous asset origin isn't Splitwise, so name it accurately in
+    // errors rather than blaming the Splitwise API for a third party's 429.
+    const service = authenticated ? SERVICE_NAME : new URL(baseUrl).host;
     return createApiClient({
       baseUrl,
-      serviceName: SERVICE_NAME,
+      serviceName: service,
       retry: { count: 1, delayMs: 2000 },
       timeout: 30_000,
       ...(authenticated ? { getToken: () => this.requireKey() } : {}),
@@ -116,7 +124,7 @@ export class SplitwiseClient {
             ? 'SPLITWISE_API_KEY is invalid or missing'
             : 'The asset URL was rejected (401) — presigned URLs are short-lived, so re-run to get a fresh one',
         ),
-      onRateLimited: () => new Error('Rate limited by Splitwise API'),
+      onRateLimited: () => new Error(`Rate limited by ${authenticated ? 'Splitwise API' : service}`),
     });
   }
 
@@ -156,7 +164,7 @@ export class SplitwiseClient {
       // would invalidate the URL.
       return await api.fetchRaw('GET', `${target.pathname}${target.search}`);
     } catch (err) {
-      throw redactUrlQueries(err);
+      throw redactAssetQuery(err, target.search);
     }
   }
 }

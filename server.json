@@ -22,6 +22,13 @@
           "isRequired": true,
           "format": "string",
           "isSecret": true
+        },
+        {
+          "name": "SPLITWISE_OUTPUT_DIR",
+          "description": "Directory sw_get_receipt writes downloaded receipts into (default: the working directory)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
         }
       ]
     }

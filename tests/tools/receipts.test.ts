@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -7,7 +7,7 @@ import { createTestHarness, parseToolResult } from '../helpers.js';
 
 process.env.SPLITWISE_API_KEY = 'test-key';
 
-const { SplitwiseClient } = await import('../../src/client.js');
+const { SplitwiseClient, isSplitwiseHost } = await import('../../src/client.js');
 const { registerReceiptTools } = await import('../../src/tools/receipts.js');
 
 // The receipt URL shapes Splitwise actually serves: its own API (needs the key)
@@ -73,6 +73,24 @@ function errorText(result: CallToolResult): string {
   const block = result.content?.[0];
   return block && block.type === 'text' ? block.text : '';
 }
+
+// `isSplitwiseHost` is the single decision point for whether the API key
+// leaves the process, so pin its boundaries rather than covering it only
+// transitively through the download tests.
+describe('isSplitwiseHost', () => {
+  it.each([
+    ['splitwise.com', true],
+    ['www.splitwise.com', true],
+    ['secure.splitwise.com', true],
+    ['WWW.SPLITWISE.COM', true],
+    ['evil-splitwise.com', false],
+    ['splitwise.com.attacker.net', false],
+    ['notsplitwise.com', false],
+    ['splitwise.s3.amazonaws.com', false],
+  ])('%s -> %s', (hostname, expected) => {
+    expect(isSplitwiseHost(hostname)).toBe(expected);
+  });
+});
 
 describe('sw_get_receipt', () => {
   // The tool writes a file into a caller-supplied directory, so it must not
@@ -242,6 +260,70 @@ describe('sw_get_receipt', () => {
     expect(message).not.toContain('SECRETSIG');
     expect(message).toContain('<redacted>');
     expect(message).toContain('AccessDenied');
+    // Errors from a third-party asset host name that host, not Splitwise.
+    expect(message).toContain('splitwise.s3.amazonaws.com error 403');
+
+    await harness.close();
+  });
+
+  it('reports an empty receipt body rather than writing a zero-byte file', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(new Uint8Array(0), 'image/jpeg'));
+    const harness = await harnessWith(fetchMock);
+
+    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+
+    expect(result.isError).toBe(true);
+    expect(errorText(result)).toContain('empty receipt body');
+    expect(readdirSync(outputDir)).toEqual([]);
+
+    await harness.close();
+  });
+
+  it('skips the inline image when the receipt is over the size limit', async () => {
+    // 4 MB + 1 byte, with JPEG magic bytes so it is unambiguously an image.
+    const big = new Uint8Array(4 * 1024 * 1024 + 1);
+    big.set(JPEG.subarray(0, 3));
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(big, 'image/jpeg'));
+    const harness = await harnessWith(fetchMock);
+
+    const result = await harness.callTool('sw_get_receipt', {
+      id: 4644814211,
+      inline: true,
+      output_dir: outputDir,
+    });
+    const body = parseToolResult<{ inline: boolean; inline_skipped: string }>(result);
+
+    expect(body.inline).toBe(false);
+    expect(body.inline_skipped).toContain('inline limit');
+    // The file is still written — only the base64 copy is dropped.
+    expect(result.content).toHaveLength(1);
+    expect(readdirSync(outputDir)).toEqual(['splitwise-receipt-4644814211.jpg']);
+
+    await harness.close();
+  });
+
+  it('redacts the signature even when the upstream echoes the whole URL back', async () => {
+    // S3's SignatureDoesNotMatch body echoes the signed URL. Redaction keys off
+    // the exact query we sent, so it scrubs the echo too — not just the request
+    // path the error formatter happens to name.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: S3_RECEIPT_URL }))
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        headers: new Headers(),
+        text: async () => `<Error><Code>SignatureDoesNotMatch</Code><StringToSign>${S3_RECEIPT_URL}</StringToSign></Error>`,
+      });
+    const harness = await harnessWith(fetchMock);
+
+    const message = errorText(await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir }));
+
+    expect(message).not.toContain('SECRETSIG');
+    expect(message).toContain('SignatureDoesNotMatch');
 
     await harness.close();
   });
