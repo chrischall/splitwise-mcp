@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { textResult } from '@chrischall/mcp-utils';
+import { textResult, pruneUndefined } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
@@ -34,9 +34,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
       confirm: schemaConfirm,
     },
   }, async ({ name, group_type, simplify_by_default, confirm }) => {
-    const body: Record<string, unknown> = { name };
-    if (group_type !== undefined) body.group_type = group_type;
-    if (simplify_by_default !== undefined) body.simplify_by_default = simplify_by_default;
+    const body = pruneUndefined({ name, group_type, simplify_by_default });
     const gate = previewUnlessConfirmed(confirm, `Create Splitwise group "${name}"`, 'POST', '/create_group', body);
     if (gate) return gate;
     const data = await client.request('POST', '/create_group', body);

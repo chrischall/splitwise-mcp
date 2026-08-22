@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { textResult } from '@chrischall/mcp-utils';
+import { textResult, pruneUndefined } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
@@ -23,9 +23,7 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
       confirm: schemaConfirm,
     },
   }, async ({ user_email, user_first_name, user_last_name, confirm }) => {
-    const body: Record<string, unknown> = { user_email };
-    if (user_first_name !== undefined) body.user_first_name = user_first_name;
-    if (user_last_name !== undefined) body.user_last_name = user_last_name;
+    const body = pruneUndefined({ user_email, user_first_name, user_last_name });
     const gate = previewUnlessConfirmed(confirm, `Add ${user_email} as a Splitwise friend`, 'POST', '/create_friend', body);
     if (gate) return gate;
     const data = await client.request('POST', '/create_friend', body);

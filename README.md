@@ -20,6 +20,7 @@ Ask Claude things like:
 - *"Add Meredith to the household group"*
 - *"Show me recent expenses"*
 - *"Delete that duplicate expense"*
+- *"Download the receipt from that hotel expense"*
 
 ## Requirements
 
@@ -112,10 +113,11 @@ Add to Claude Desktop config:
 | Env var | Required | Notes |
 |---------|----------|-------|
 | `SPLITWISE_API_KEY` | Yes | API key from [splitwise.com/apps/register](https://secure.splitwise.com/apps/register) |
+| `SPLITWISE_OUTPUT_DIR` | No | Where `sw_get_receipt` writes downloaded receipts. Defaults to the current working directory. |
 
 ## Available tools
 
-20 tools across 5 domains. All tools are prefixed `sw_`.
+26 tools across 6 domains. All tools are prefixed `sw_`.
 
 ### User
 
@@ -123,6 +125,7 @@ Add to Claude Desktop config:
 |------|-------------|
 | `sw_get_current_user` | Get the authenticated user's profile |
 | `sw_get_user` | Get another user's profile by ID |
+| `sw_update_user` | Update the current user's profile fields |
 
 ### Groups
 
@@ -158,6 +161,12 @@ Add to Claude Desktop config:
 | `sw_create_comment` | Add a comment to an expense |
 | `sw_delete_comment` | Delete a comment |
 
+### Receipts
+
+| Tool | What it does |
+|------|-------------|
+| `sw_get_receipt` | Download an expense's receipt image/PDF with the server's credentials and write it to a file |
+
 ### Utilities
 
 | Tool | What it does |
@@ -169,6 +178,8 @@ Add to Claude Desktop config:
 ## Troubleshooting
 
 **"SPLITWISE_API_KEY is required"** -- set the environment variable in your MCP config or a `.env` file.
+
+**401 when opening a receipt URL** -- the `receipt.original` / `receipt.large` URLs on an expense are not public; they need the API key. Use `sw_get_receipt` instead of fetching them directly.
 
 **429 rate limit** -- Splitwise has undocumented rate limits. Wait a moment and retry.
 
@@ -191,8 +202,9 @@ src/
     user.ts         sw_get_current_user, sw_get_user
     groups.ts       group CRUD and membership
     friends.ts      friend list and management
-    expenses.ts     expense CRUD, comments
-    utilities.ts    notifications, categories, currencies
+    expenses.ts     expense CRUD
+    receipts.ts     authenticated receipt download
+    utilities.ts    notifications, categories, currencies, comments
 ```
 
 ## License
