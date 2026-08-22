@@ -52,13 +52,18 @@ function parseAssetUrl(url: string): URL {
 }
 
 /**
- * Strip query strings out of an error message. A failed `fetchRaw` names the
- * path it requested, and a receipt URL's query carries a signed, capability-
- * bearing token that must not reach a tool result.
+ * Strip the asset URL's signed query string out of an error message. A failed
+ * `fetchRaw` names the path it requested, and a receipt URL's query carries a
+ * signed, capability-bearing token that must not reach a tool result.
+ *
+ * Matches the exact query bytes we sent rather than a pattern for the message
+ * shape: that keeps working whatever an upstream formatter does with the URL
+ * (relative path today, absolute URL tomorrow), and it can't mangle an error
+ * body that happens to contain a `?`.
  */
-function redactUrlQueries(err: unknown): unknown {
-  if (!(err instanceof Error)) return err;
-  const message = err.message.replace(/(\s\/\S*?)\?\S*/g, '$1?<redacted>');
+function redactAssetQuery(err: unknown, search: string): unknown {
+  if (!(err instanceof Error) || !search) return err;
+  const message = err.message.split(search).join('?<redacted>');
   if (message === err.message) return err;
   return err instanceof ApiError ? new ApiError(err.status, message) : new Error(message);
 }
@@ -159,7 +164,7 @@ export class SplitwiseClient {
       // would invalidate the URL.
       return await api.fetchRaw('GET', `${target.pathname}${target.search}`);
     } catch (err) {
-      throw redactUrlQueries(err);
+      throw redactAssetQuery(err, target.search);
     }
   }
 }

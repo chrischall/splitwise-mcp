@@ -306,6 +306,28 @@ describe('sw_get_receipt', () => {
     await harness.close();
   });
 
+  it('redacts the signature even when the upstream echoes the whole URL back', async () => {
+    // S3's SignatureDoesNotMatch body echoes the signed URL. Redaction keys off
+    // the exact query we sent, so it scrubs the echo too — not just the request
+    // path the error formatter happens to name.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: S3_RECEIPT_URL }))
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        headers: new Headers(),
+        text: async () => `<Error><Code>SignatureDoesNotMatch</Code><StringToSign>${S3_RECEIPT_URL}</StringToSign></Error>`,
+      });
+    const harness = await harnessWith(fetchMock);
+
+    const message = errorText(await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir }));
+
+    expect(message).not.toContain('SECRETSIG');
+    expect(message).toContain('SignatureDoesNotMatch');
+
+    await harness.close();
+  });
+
   it('rejects a non-https receipt URL rather than fetching it', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(
       expenseResponse({ original: 'http://evil.example.com/receipt.jpg' }),
