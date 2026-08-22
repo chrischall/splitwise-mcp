@@ -205,9 +205,13 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
         }
       }
     }
-    // Suppress the suggestion when the bytes are already on their way back.
+    // Gate the suggestion on the FLAG, not the outcome — the same test the
+    // throw path's `routes` uses below. `inlined` conflates "never asked for
+    // inline" with "asked, and it was refused for size"; suggesting it in the
+    // second case contradicts the `inline_skipped` note in the same result.
     const textNote =
-      [textDiagnosis, inlined ? undefined : textSuggestion].filter(Boolean).join(' ') || undefined;
+      [textDiagnosis, inline === true ? undefined : textSuggestion].filter(Boolean).join(' ') ||
+      undefined;
 
     // Nothing reached the caller: no file, no bytes, no text. Fail loudly and
     // name the way out rather than reporting a success with an empty result.

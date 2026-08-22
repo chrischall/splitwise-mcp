@@ -518,6 +518,34 @@ describe('sw_get_receipt', () => {
     await harness.close();
   });
 
+  it('does not suggest inline on the success path when inline was already rejected', async () => {
+    // inline + extract_text on an oversized scan, write SUCCEEDS -> success path.
+    // text_note must not advise a flag inline_skipped already reports as refused.
+    const bigScan = new Uint8Array(4 * 1024 * 1024 + 1);
+    bigScan.set(SCANNED_PDF.subarray(0, Math.min(SCANNED_PDF.length, bigScan.length)));
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(bigScan, 'application/pdf'));
+    const harness = await harnessWith(fetchMock);
+
+    const result = await harness.callTool('sw_get_receipt', {
+      id: 4644814211,
+      extract_text: true,
+      inline: true,
+      output_dir: outputDir,
+    });
+    const body = parseToolResult<{ path: string; text_note: string; inline_skipped: string }>(result);
+
+    expect(result.isError).toBeFalsy();
+    expect(body.path).toBeTruthy();
+    // The diagnosis stays; the stale suggestion must not.
+    expect(body.text_note).toContain('no text layer');
+    expect(body.text_note).not.toContain('inline:true');
+    expect(body.inline_skipped).toContain('inline limit');
+
+    await harness.close();
+  });
+
   it('reports a clear error when the expense has no receipt', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(expenseResponse({ original: null, large: null }));
     const harness = await harnessWith(fetchMock);
