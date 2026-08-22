@@ -295,7 +295,7 @@ describe('sw_get_receipt', () => {
       .mockResolvedValueOnce(binaryResponse(TEXT_PDF, 'application/pdf'));
     const harness = await harnessWith(fetchMock);
 
-    const body = parseToolResult<{ text: string; path: string }>(
+    const body = parseToolResult<{ text: string; path: string; bytes: number }>(
       await harness.callTool('sw_get_receipt', {
         id: 4644814211,
         extract_text: true,
@@ -305,7 +305,10 @@ describe('sw_get_receipt', () => {
 
     expect(body.text).toContain('MPHSBANDS Band Shirts');
     expect(body.text).toContain('Total 129.00 USD');
-    // Extraction must not consume the bytes the write and base64 still need.
+    // pdf.js detaches the buffer it is handed, so extractPdfText copies first.
+    // `bytes` is read AFTER extraction — a detached buffer reports 0 here.
+    // (The written file is not a guard: the write already ran by then.)
+    expect(body.bytes).toBe(TEXT_PDF.length);
     expect(readFileSync(body.path).length).toBe(TEXT_PDF.length);
 
     await harness.close();
@@ -419,6 +422,71 @@ describe('sw_get_receipt', () => {
     await harness.close();
   });
 
+  it('trusts the magic bytes over a mis-declared Content-Type', async () => {
+    // Object stores hand out application/force-download, application/x-pdf and
+    // friends. Believing the header would misname the file AND refuse text.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(TEXT_PDF, 'application/force-download'));
+    const harness = await harnessWith(fetchMock);
+
+    const body = parseToolResult<{ content_type: string; path: string; text: string }>(
+      await harness.callTool('sw_get_receipt', {
+        id: 4644814211,
+        extract_text: true,
+        output_dir: outputDir,
+      }),
+    );
+
+    expect(body.content_type).toBe('application/pdf');
+    expect(basename(body.path)).toBe('splitwise-receipt-4644814211.pdf');
+    expect(body.text).toContain('Total 129.00 USD');
+
+    await harness.close();
+  });
+
+  it('keeps a declared type the magic bytes cannot identify', async () => {
+    // Sniffing only knows a few formats; anything else keeps what was declared.
+    const heic = new Uint8Array([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70]);
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(heic, 'image/heic'));
+    const harness = await harnessWith(fetchMock);
+
+    const body = parseToolResult<{ content_type: string; path: string }>(
+      await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir }),
+    );
+
+    expect(body.content_type).toBe('image/heic');
+    expect(basename(body.path)).toBe('splitwise-receipt-4644814211.heic');
+
+    await harness.close();
+  });
+
+  it('blames the missing text layer, not the flag the caller already passed', async () => {
+    // Read-only server + extract_text on a scan: advising extract_text:true
+    // here would be advice to repeat the call that just failed.
+    writeFileSync(join(outputDir, 'blocker'), 'not a directory');
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(SCANNED_PDF, 'application/pdf'));
+    const harness = await harnessWith(fetchMock);
+
+    const result = await harness.callTool('sw_get_receipt', {
+      id: 4644814211,
+      extract_text: true,
+      output_dir: join(outputDir, 'blocker', 'sub'),
+    });
+
+    expect(result.isError).toBe(true);
+    expect(errorText(result)).toContain('no text layer');
+    expect(errorText(result)).toContain('inline:true');
+    // Not the generic "re-run with extract_text:true" advice.
+    expect(errorText(result)).not.toContain('extract_text:true');
+
+    await harness.close();
+  });
+
   it('reports a clear error when the expense has no receipt', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(expenseResponse({ original: null, large: null }));
     const harness = await harnessWith(fetchMock);
@@ -490,6 +558,9 @@ describe('sw_get_receipt', () => {
 
     expect(body.inline).toBe(false);
     expect(body.inline_skipped).toContain('inline limit');
+    // The write succeeded, so it must point at the file, not at write:true.
+    expect(body.inline_skipped).toContain('path above');
+    expect(body.inline_skipped).not.toContain('write:true');
     // The file is still written — only the base64 copy is dropped.
     expect(result.content).toHaveLength(1);
     expect(readdirSync(outputDir)).toEqual(['splitwise-receipt-4644814211.jpg']);
