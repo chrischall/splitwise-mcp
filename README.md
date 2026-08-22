@@ -165,7 +165,7 @@ Add to Claude Desktop config:
 
 | Tool | What it does |
 |------|-------------|
-| `sw_get_receipt` | Download an expense's receipt image/PDF with the server's credentials and write it to a file |
+| `sw_get_receipt` | Download an expense's receipt image/PDF with the server's credentials. Returns it inline (`inline`), as extracted PDF text (`extract_text`), and/or written to a file |
 
 ### Utilities
 
@@ -180,6 +180,8 @@ Add to Claude Desktop config:
 **"SPLITWISE_API_KEY is required"** -- set the environment variable in your MCP config or a `.env` file.
 
 **401 when opening a receipt URL** -- the `receipt.original` / `receipt.large` URLs on an expense are not public; they need the API key. Use `sw_get_receipt` instead of fetching them directly.
+
+**Receipt lands somewhere you can't read it** -- `sw_get_receipt` writes to the *server's* filesystem, which is not the caller's when the server is hosted or containerised. Pass `inline: true` for the bytes (an image block for images, an embedded resource for PDFs) or `extract_text: true` for a PDF's text. Pass `write: false` to skip the write; if it fails on its own (read-only filesystem), the call still succeeds and reports `write_error` as long as you asked for content.
 
 **429 rate limit** -- Splitwise has undocumented rate limits. Wait a moment and retry.
 
@@ -203,7 +205,7 @@ src/
     groups.ts       group CRUD and membership
     friends.ts      friend list and management
     expenses.ts     expense CRUD
-    receipts.ts     authenticated receipt download
+    receipts.ts     authenticated receipt download + PDF text extraction
     utilities.ts    notifications, categories, currencies, comments
 ```
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
@@ -19,6 +19,55 @@ const S3_RECEIPT_URL =
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
 const PDF = new Uint8Array([...Buffer.from('%PDF-1.4\n', 'latin1'), 0x0a]);
+
+/**
+ * Build a minimal single-page PDF whose content stream shows `lines` of text.
+ * Pass no lines for a PDF with no text layer — what a scanned or photographed
+ * receipt looks like to an extractor. Hand-rolled so the fixture stays
+ * readable in-tree instead of being an opaque committed binary.
+ */
+function makePdf(lines: string[]): Uint8Array {
+  const show = lines.map((l, i) => `${i === 0 ? '' : '0 -20 Td '}(${l}) Tj `).join('');
+  const stream = Buffer.from(lines.length ? `BT /F1 12 Tf 72 720 Td ${show}ET` : 'q Q', 'latin1');
+  const objects = [
+    Buffer.from('<</Type/Catalog/Pages 2 0 R>>', 'latin1'),
+    Buffer.from('<</Type/Pages/Kids[3 0 R]/Count 1>>', 'latin1'),
+    Buffer.from('<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>', 'latin1'),
+    Buffer.concat([
+      Buffer.from(`<</Length ${stream.length}>>stream\n`, 'latin1'),
+      stream,
+      Buffer.from('\nendstream', 'latin1'),
+    ]),
+    Buffer.from('<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>', 'latin1'),
+  ];
+
+  const head = Buffer.from('%PDF-1.4\n', 'latin1');
+  const chunks: Buffer[] = [head];
+  const offsets: number[] = [];
+  let at = head.length;
+  objects.forEach((body, i) => {
+    offsets.push(at);
+    const obj = Buffer.concat([
+      Buffer.from(`${i + 1} 0 obj`, 'latin1'),
+      body,
+      Buffer.from('endobj\n', 'latin1'),
+    ]);
+    chunks.push(obj);
+    at += obj.length;
+  });
+
+  const xref = [
+    `xref\n0 ${objects.length + 1}\n`,
+    '0000000000 65535 f \n',
+    ...offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`),
+    `trailer<</Size ${objects.length + 1}/Root 1 0 R>>\nstartxref\n${at}\n%%EOF\n`,
+  ].join('');
+  chunks.push(Buffer.from(xref, 'latin1'));
+  return new Uint8Array(Buffer.concat(chunks));
+}
+
+const TEXT_PDF = makePdf(['MPHSBANDS Band Shirts', 'Total 129.00 USD']);
+const SCANNED_PDF = makePdf([]);
 
 /** A JSON response as `createApiClient` consumes it (it calls `.text()`). */
 function jsonResponse(data: unknown) {
@@ -213,18 +262,160 @@ describe('sw_get_receipt', () => {
     await harness.close();
   });
 
-  it('explains why a PDF cannot come back inline', async () => {
+  it('returns a PDF inline as an embedded resource', async () => {
+    // The whole point of the fix: a caller with no access to this server's
+    // filesystem still gets the bytes.
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
       .mockResolvedValueOnce(binaryResponse(PDF, 'application/pdf'));
     const harness = await harnessWith(fetchMock);
 
-    const body = parseToolResult<{ inline: boolean; inline_skipped: string }>(
-      await harness.callTool('sw_get_receipt', { id: 4644814211, inline: true, output_dir: outputDir }),
+    const result = await harness.callTool('sw_get_receipt', {
+      id: 4644814211,
+      inline: true,
+      output_dir: outputDir,
+    });
+
+    expect(parseToolResult<{ inline: boolean }>(result).inline).toBe(true);
+    expect(result.content?.[1]).toMatchObject({
+      type: 'resource',
+      resource: {
+        uri: 'splitwise://expenses/4644814211/receipt',
+        mimeType: 'application/pdf',
+        blob: Buffer.from(PDF).toString('base64'),
+      },
+    });
+
+    await harness.close();
+  });
+
+  it('extracts the text layer of a PDF receipt', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(TEXT_PDF, 'application/pdf'));
+    const harness = await harnessWith(fetchMock);
+
+    const body = parseToolResult<{ text: string; path: string }>(
+      await harness.callTool('sw_get_receipt', {
+        id: 4644814211,
+        extract_text: true,
+        output_dir: outputDir,
+      }),
     );
 
-    expect(body.inline).toBe(false);
-    expect(body.inline_skipped).toContain('Only image receipts');
+    expect(body.text).toContain('MPHSBANDS Band Shirts');
+    expect(body.text).toContain('Total 129.00 USD');
+    // Extraction must not consume the bytes the write and base64 still need.
+    expect(readFileSync(body.path).length).toBe(TEXT_PDF.length);
+
+    await harness.close();
+  });
+
+  it('says so when a PDF has no text layer to extract', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(SCANNED_PDF, 'application/pdf'));
+    const harness = await harnessWith(fetchMock);
+
+    const body = parseToolResult<{ text?: string; text_note: string }>(
+      await harness.callTool('sw_get_receipt', {
+        id: 4644814211,
+        extract_text: true,
+        output_dir: outputDir,
+      }),
+    );
+
+    expect(body.text).toBeUndefined();
+    expect(body.text_note).toContain('no text layer');
+
+    await harness.close();
+  });
+
+  it('declines to extract text from an image receipt', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(JPEG, 'image/jpeg'));
+    const harness = await harnessWith(fetchMock);
+
+    const body = parseToolResult<{ text?: string; text_note: string }>(
+      await harness.callTool('sw_get_receipt', {
+        id: 4644814211,
+        extract_text: true,
+        output_dir: outputDir,
+      }),
+    );
+
+    expect(body.text).toBeUndefined();
+    expect(body.text_note).toContain('PDFs only');
+
+    await harness.close();
+  });
+
+  it('skips the write entirely when write:false', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(PDF, 'application/pdf'));
+    const harness = await harnessWith(fetchMock);
+
+    const body = parseToolResult<{ path?: string; inline: boolean }>(
+      await harness.callTool('sw_get_receipt', {
+        id: 4644814211,
+        inline: true,
+        write: false,
+        output_dir: outputDir,
+      }),
+    );
+
+    expect(body.path).toBeUndefined();
+    expect(body.inline).toBe(true);
+    expect(readdirSync(outputDir)).toEqual([]);
+
+    await harness.close();
+  });
+
+  it('still returns the content when the filesystem is not writable', async () => {
+    // A hosted server runs read-only: the write must not sink the whole call.
+    // An output_dir nested under a regular file makes mkdir fail as ENOTDIR
+    // for any uid, root included.
+    writeFileSync(join(outputDir, 'blocker'), 'not a directory');
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(PDF, 'application/pdf'));
+    const harness = await harnessWith(fetchMock);
+
+    const result = await harness.callTool('sw_get_receipt', {
+      id: 4644814211,
+      inline: true,
+      output_dir: join(outputDir, 'blocker', 'sub'),
+    });
+    const body = parseToolResult<{ path?: string; write_error: string; inline: boolean }>(result);
+
+    expect(result.isError).toBeFalsy();
+    expect(body.path).toBeUndefined();
+    expect(body.write_error).toMatch(/ENOTDIR|EACCES|ENOENT/);
+    expect(body.inline).toBe(true);
+    expect(result.content?.[1]?.type).toBe('resource');
+
+    await harness.close();
+  });
+
+  it('fails loudly when the write fails and nothing was asked for in its place', async () => {
+    writeFileSync(join(outputDir, 'blocker'), 'not a directory');
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(PDF, 'application/pdf'));
+    const harness = await harnessWith(fetchMock);
+
+    const result = await harness.callTool('sw_get_receipt', {
+      id: 4644814211,
+      output_dir: join(outputDir, 'blocker', 'sub'),
+    });
+
+    expect(result.isError).toBe(true);
+    // The error has to name the way out, not just the failure.
+    expect(errorText(result)).toContain('inline:true');
+    expect(errorText(result)).toContain('extract_text:true');
+
     await harness.close();
   });
 

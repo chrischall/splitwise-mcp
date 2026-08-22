@@ -132,7 +132,7 @@
     },
     {
       "name": "sw_get_receipt",
-      "description": "Download the receipt attached to an expense"
+      "description": "Download an expense receipt (inline bytes, PDF text, or a file)"
     },
     {
       "name": "sw_get_comments",
