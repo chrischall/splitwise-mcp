@@ -75,6 +75,19 @@ function errorText(result: CallToolResult): string {
 }
 
 describe('sw_get_receipt', () => {
+  // The tool writes a file into a caller-supplied directory, so it must not
+  // claim readOnlyHint — hosts use that to skip the approval prompt.
+  it('does not advertise itself as read-only', async () => {
+    const harness = await harnessWith(vi.fn());
+
+    const { tools } = await harness.client.listTools();
+    const receipt = tools.find((t) => t.name === 'sw_get_receipt');
+
+    expect(receipt?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+
+    await harness.close();
+  });
+
   it('downloads the receipt bytes and writes them to a file', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL, large: API_RECEIPT_URL }))

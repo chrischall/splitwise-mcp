@@ -60,8 +60,11 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
   server.registerTool('sw_get_receipt', {
     description:
       "Download the receipt image or PDF attached to a Splitwise expense. The receipt URLs returned by sw_get_expense need the server's credentials — fetching them directly returns 401 — so use this tool instead. It writes the authenticated bytes to a file and returns the path; set inline:true to also get an image receipt back in the result. Files go to output_dir, else $SPLITWISE_OUTPUT_DIR, else the current directory, and an existing file is never overwritten.",
-    // No remote mutation, and the local write is always to a fresh filename.
-    annotations: { readOnlyHint: true },
+    // Not read-only: this writes a file into a caller-supplied directory, and
+    // `readOnlyHint` is what a host reads when deciding to skip its approval
+    // prompt. Not destructive either — `uniquePath` always picks a filename
+    // that doesn't exist, so an existing file is never touched.
+    annotations: { readOnlyHint: false, destructiveHint: false },
     inputSchema: {
       id: z.number().describe('Expense ID (the same id sw_get_expense takes)'),
       size: z
