@@ -232,7 +232,13 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
       inline: inlined,
       ...(inline === true && oversized
         ? {
-            inline_skipped: `Receipt is ${asset.bytes.length} bytes, over the ${MAX_INLINE_BYTES}-byte inline limit — fetch it with write:true and read it from disk.`,
+            // The write outcome is already known, so don't advise `write:true`
+            // to someone who either has the file or just watched the write fail.
+            inline_skipped:
+              `Receipt is ${asset.bytes.length} bytes, over the ${MAX_INLINE_BYTES}-byte inline limit — ` +
+              (path !== undefined
+                ? 'read it from the path above.'
+                : 'get it on disk instead, with write:true and an output_dir this server can write to.'),
           }
         : {}),
       ...(text !== undefined ? { text } : {}),

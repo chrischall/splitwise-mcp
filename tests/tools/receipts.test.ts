@@ -295,7 +295,7 @@ describe('sw_get_receipt', () => {
       .mockResolvedValueOnce(binaryResponse(TEXT_PDF, 'application/pdf'));
     const harness = await harnessWith(fetchMock);
 
-    const body = parseToolResult<{ text: string; path: string }>(
+    const body = parseToolResult<{ text: string; path: string; bytes: number }>(
       await harness.callTool('sw_get_receipt', {
         id: 4644814211,
         extract_text: true,
@@ -305,7 +305,10 @@ describe('sw_get_receipt', () => {
 
     expect(body.text).toContain('MPHSBANDS Band Shirts');
     expect(body.text).toContain('Total 129.00 USD');
-    // Extraction must not consume the bytes the write and base64 still need.
+    // pdf.js detaches the buffer it is handed, so extractPdfText copies first.
+    // `bytes` is read AFTER extraction — a detached buffer reports 0 here.
+    // (The written file is not a guard: the write already ran by then.)
+    expect(body.bytes).toBe(TEXT_PDF.length);
     expect(readFileSync(body.path).length).toBe(TEXT_PDF.length);
 
     await harness.close();
@@ -555,6 +558,9 @@ describe('sw_get_receipt', () => {
 
     expect(body.inline).toBe(false);
     expect(body.inline_skipped).toContain('inline limit');
+    // The write succeeded, so it must point at the file, not at write:true.
+    expect(body.inline_skipped).toContain('path above');
+    expect(body.inline_skipped).not.toContain('write:true');
     // The file is still written — only the base64 copy is dropped.
     expect(result.content).toHaveLength(1);
     expect(readdirSync(outputDir)).toEqual(['splitwise-receipt-4644814211.jpg']);
