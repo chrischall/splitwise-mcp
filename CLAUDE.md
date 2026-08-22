@@ -1,6 +1,6 @@
 # splitwise-mcp
 
-MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 25 tools to Claude over stdio. Built on `@chrischall/mcp-utils` (`runMcp`, `createApiClient`, `readEnvVar`, `textResult`).
+MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 26 tools to Claude over stdio. Built on `@chrischall/mcp-utils` (`runMcp`, `createApiClient`, `readEnvVar`, `textResult`).
 
 ## Commands
 
@@ -36,6 +36,7 @@ src/
     friends.ts    # sw_list_friends, sw_create_friend, sw_delete_friend
     expenses.ts   # sw_list_expenses, sw_get_expense, sw_create_expense,
                   #   sw_update_expense, sw_delete_expense, sw_undelete_expense
+    receipts.ts   # sw_get_receipt — authenticated receipt download
     utilities.ts  # sw_get_notifications, sw_get_categories, sw_get_currencies,
                   #   sw_get_comments, sw_create_comment, sw_delete_comment
 ```
@@ -46,6 +47,7 @@ Each tool file exports a `register<Domain>Tools(server, client)` function that c
 
 ```
 SPLITWISE_API_KEY=<your key>   # Required. From https://secure.splitwise.com/apps/register
+SPLITWISE_OUTPUT_DIR=<path>    # Optional. Where sw_get_receipt writes files (default: cwd)
 ```
 
 Loaded via `loadDotenvSafely` (from `@chrischall/mcp-utils`) from `.env` next to `dist/`, with `override: false` so a host-provided value always wins; a missing `dotenv` module is swallowed (mcpb bundles externalize it — see `bundle` script's `--external:dotenv` — and the host provides env). `readEnvVar` (also from `@chrischall/mcp-utils`) treats blank, `"undefined"`, `"null"`, and unsubstituted `${FOO}` placeholders as unset.
@@ -121,4 +123,6 @@ write-verification, transport archetypes, testing traps) live in
 - **Soft delete / restore**: delete tools soft-delete; pair each with the matching `*_undelete_*` tool (or the Splitwise web UI).
 - **stdio transport**: server logs to **stderr** only — stdout is reserved for JSON-RPC. Same applies to anything added later.
 - **Comments live in `utilities.ts`**: `sw_get_comments` / `sw_create_comment` / `sw_delete_comment` are registered by `registerUtilityTools`, not by the expense tools file.
+- **Receipts need auth**: the `receipt.original` / `receipt.large` URLs on an expense 401 without the API key. `sw_get_receipt` re-fetches them through `SplitwiseClient.fetchAsset`, which builds a per-origin `createApiClient` and attaches the key **only** for `*.splitwise.com` hosts — a receipt can also be served from a presigned S3 URL, which must never see the key. Errors from that path run through `redactUrlQueries` so a signed query string can't land in a tool result.
+- **`manifest.json` tool list**: nothing generates it. `tests/index.test.ts` asserts it matches the registered tools — add new tools in both places.
 - **Plugin files**: `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` are for Claude Code plugin distribution — not part of the MCP runtime.
