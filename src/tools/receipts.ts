@@ -176,27 +176,38 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
     const oversized = asset.bytes.length > MAX_INLINE_BYTES;
     const inlined = inline === true && !oversized;
 
+    // Diagnosis and suggestion are kept apart: the diagnosis is always true,
+    // while the suggestion is only worth making if that route is still open.
+    // Folding them into one string is how a caller ends up being told to use a
+    // flag they already passed.
     let text: string | undefined;
-    let textNote: string | undefined;
+    let textDiagnosis: string | undefined;
+    let textSuggestion: string | undefined;
     if (extract_text === true) {
       if (mimeType !== PDF_MIME) {
-        textNote = `Text extraction covers PDFs only; this receipt is ${mimeType ?? 'of an unknown type'}. Use inline:true to get the bytes.`;
+        textDiagnosis = `Text extraction covers PDFs only; this receipt is ${mimeType ?? 'of an unknown type'}.`;
+        textSuggestion = 'Use inline:true to get the bytes.';
       } else {
         try {
           const extracted = await extractPdfText(asset.bytes);
           if (extracted.length === 0) {
-            textNote = 'This PDF has no text layer — it is probably a scan or photo. Use inline:true to read the receipt itself.';
+            textDiagnosis = 'This PDF has no text layer — it is probably a scan or photo.';
+            textSuggestion = 'Use inline:true to read the receipt itself.';
           } else if (extracted.length > MAX_TEXT_CHARS) {
             text = extracted.slice(0, MAX_TEXT_CHARS);
-            textNote = `Text truncated to the first ${MAX_TEXT_CHARS} characters.`;
+            textDiagnosis = `Text truncated to the first ${MAX_TEXT_CHARS} characters.`;
           } else {
             text = extracted;
           }
         } catch (err) {
-          textNote = `Could not extract text: ${describeError(err)}. Use inline:true to get the bytes.`;
+          textDiagnosis = `Could not extract text: ${describeError(err)}.`;
+          textSuggestion = 'Use inline:true to get the bytes.';
         }
       }
     }
+    // Suppress the suggestion when the bytes are already on their way back.
+    const textNote =
+      [textDiagnosis, inlined ? undefined : textSuggestion].filter(Boolean).join(' ') || undefined;
 
     // Nothing reached the caller: no file, no bytes, no text. Fail loudly and
     // name the way out rather than reporting a success with an empty result.
@@ -204,16 +215,30 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
       const reason = writeError
         ? `could not be written (${writeError})`
         : 'was not written (write:false)';
-      // Say why the content the caller actually asked for is missing. Advising
-      // `inline:true` to someone who just passed it — because the PDF turned
-      // out to be a scan, or the file was over the cap — is worse than useless.
-      const detail = textNote
-        ? ` ${textNote}`
-        : inline === true && oversized
-          ? ` The receipt is ${asset.bytes.length} bytes, over the ${MAX_INLINE_BYTES}-byte inline limit, so it can only be read from disk — point output_dir somewhere writable.`
-          : ' Re-run with inline:true for the bytes, or extract_text:true for a PDF\'s text.';
+      // Name every blocker — more than one can apply at once — then offer only
+      // the routes still open. A flag the caller already passed is not a
+      // suggestion; when `inline` was requested it can only have been rejected
+      // for size, so it never belongs in the list.
+      const blockers = [
+        textDiagnosis,
+        inline === true && oversized
+          ? `The receipt is ${asset.bytes.length} bytes, over the ${MAX_INLINE_BYTES}-byte inline limit.`
+          : undefined,
+      ].filter((b): b is string => b !== undefined);
+
+      const routes: string[] = [];
+      if (inline !== true) routes.push('inline:true for the bytes');
+      if (extract_text !== true && mimeType === PDF_MIME) routes.push("extract_text:true for the PDF's text");
+      const advice = routes.length > 0
+        ? `Re-run with ${routes.join(' or ')}.`
+        : 'Point output_dir somewhere this server can write.';
+
       throw new Error(
-        `The receipt for expense ${id} ${reason}, and nothing was returned in its place.${detail}`,
+        [
+          `The receipt for expense ${id} ${reason}, and nothing was returned in its place.`,
+          ...blockers,
+          advice,
+        ].join(' '),
       );
     }
 
