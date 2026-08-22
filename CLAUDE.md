@@ -36,7 +36,8 @@ src/
     friends.ts    # sw_list_friends, sw_create_friend, sw_delete_friend
     expenses.ts   # sw_list_expenses, sw_get_expense, sw_create_expense,
                   #   sw_update_expense, sw_delete_expense, sw_undelete_expense
-    receipts.ts   # sw_get_receipt — authenticated receipt download
+    receipts.ts   # sw_get_receipt — authenticated receipt download,
+                  #   inline bytes, and PDF text extraction
     utilities.ts  # sw_get_notifications, sw_get_categories, sw_get_currencies,
                   #   sw_get_comments, sw_create_comment, sw_delete_comment
 ```
@@ -124,5 +125,7 @@ write-verification, transport archetypes, testing traps) live in
 - **stdio transport**: server logs to **stderr** only — stdout is reserved for JSON-RPC. Same applies to anything added later.
 - **Comments live in `utilities.ts`**: `sw_get_comments` / `sw_create_comment` / `sw_delete_comment` are registered by `registerUtilityTools`, not by the expense tools file.
 - **Receipts need auth**: the `receipt.original` / `receipt.large` URLs on an expense 401 without the API key. `sw_get_receipt` re-fetches them through `SplitwiseClient.fetchAsset`, which builds a per-origin `createApiClient` and attaches the key **only** for `*.splitwise.com` hosts — a receipt can also be served from a presigned S3 URL, which must never see the key. Errors from that path run through `redactAssetQuery`, which scrubs the exact query bytes that were sent, so a signed query string can't land in a tool result — including when an upstream echoes the whole URL back in its error body.
+- **Receipts must not depend on the filesystem**: `sw_get_receipt`'s file write is *best effort*. A hosted deployment runs from a read-only npm cache, so an unconditional write fails the whole call (`EACCES` on `<cache>/node_modules/splitwise-mcp/...`) and the caller — whose sandbox is a different filesystem anyway — can never read the path. The write is wrapped: on failure the tool reports `write_error` and still returns whatever content was asked for, and it only throws when nothing at all reached the caller (no file, no `inline`, no `text`) — with an error naming `inline:true` / `extract_text:true` as the way out. `inline` covers every type: an image block for images, an MCP embedded resource (`{type:'resource', resource:{uri, mimeType, blob}}`) for PDFs and anything else.
+- **`unpdf` is lazily imported**: `extract_text` pulls a full pdf.js build (~2.4 MB in `dist/bundle.js`). It's behind `await import('unpdf')` inside the handler so no other receipt path — and no server startup — pays for it. `getDocumentProxy` detaches the buffer it's handed, so `extractPdfText` copies via `Uint8Array.from` first; without that copy the base64 and the file write would see an empty buffer.
 - **`manifest.json` tool list**: nothing generates it. `tests/index.test.ts` asserts it matches the registered tools — add new tools in both places.
 - **Plugin files**: `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` are for Claude Code plugin distribution — not part of the MCP runtime.

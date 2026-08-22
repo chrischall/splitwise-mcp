@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
   textResult,
   imageResult,
@@ -17,8 +18,13 @@ interface ExpenseReceipt {
 
 type ReceiptSize = 'original' | 'large';
 
-/** Cap on bytes returned as base64 in the tool result; the file is written regardless. */
+/** Cap on bytes returned as base64 in the tool result. */
 const MAX_INLINE_BYTES = 4 * 1024 * 1024;
+
+/** Cap on extracted characters, so a long PDF can't flood the result. */
+const MAX_TEXT_CHARS = 100_000;
+
+const PDF_MIME = 'application/pdf';
 
 /** Content types that carry no information about the actual format. */
 const GENERIC_TYPES = new Set(['application/octet-stream', 'binary/octet-stream']);
@@ -35,7 +41,7 @@ function isPdf(bytes: Uint8Array): boolean {
 function resolveMimeType(contentType: string | null, bytes: Uint8Array): string | undefined {
   const declared = (contentType ?? '').split(';')[0]!.trim().toLowerCase();
   if (declared && !GENERIC_TYPES.has(declared)) return declared;
-  return sniffMimeBytes(bytes) ?? (isPdf(bytes) ? 'application/pdf' : undefined);
+  return sniffMimeBytes(bytes) ?? (isPdf(bytes) ? PDF_MIME : undefined);
 }
 
 /** Extension from a URL path (`…/receipt.jpg?sig=…` → `jpg`), when it has one. */
@@ -56,10 +62,36 @@ function extensionFor(mimeType: string | undefined, url: string): string {
   return extensionFromUrl(url) ?? 'bin';
 }
 
+/**
+ * Extract a PDF's text layer. `unpdf` is imported lazily so the cost lands only
+ * on calls that ask for text — it is a sizable pdf.js build, and every other
+ * receipt path (download, inline, write) must not pay for it at startup.
+ *
+ * Returns `''` for a PDF with no text layer, which is the normal case for a
+ * photographed or scanned receipt.
+ */
+async function extractPdfText(bytes: Uint8Array): Promise<string> {
+  const { extractText, getDocumentProxy } = await import('unpdf');
+  // Copy: pdf.js transfers/detaches the buffer it is handed, and the caller
+  // still needs these bytes for the base64 and the file write.
+  const doc = await getDocumentProxy(Uint8Array.from(bytes));
+  const { text } = await extractText(doc, { mergePages: true });
+  return (Array.isArray(text) ? text.join('\n') : text).trim();
+}
+
+/** An MCP embedded-resource block — how non-image bytes ride back in a result. */
+function resourceBlock(uri: string, mimeType: string, base64: string): CallToolResult['content'][number] {
+  return { type: 'resource', resource: { uri, mimeType, blob: base64 } };
+}
+
+function describeError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 export function registerReceiptTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool('sw_get_receipt', {
     description:
-      "Download the receipt image or PDF attached to a Splitwise expense. The receipt URLs returned by sw_get_expense need the server's credentials — fetching them directly returns 401 — so use this tool instead. It writes the authenticated bytes to a file and returns the path; set inline:true to also get an image receipt back in the result. Files go to output_dir, else $SPLITWISE_OUTPUT_DIR, else the current directory, and an existing file is never overwritten.",
+      "Download the receipt image or PDF attached to a Splitwise expense. The receipt URLs returned by sw_get_expense need the server's credentials — fetching them directly returns 401 — so use this tool instead. Set inline:true to get the bytes back in the result (images AND PDFs), or extract_text:true to get a PDF's text without the binary at all — both work when the caller can't see this server's filesystem. It also writes the file and returns the path, unless write:false or the filesystem is read-only.",
     // Not read-only: this writes a file into a caller-supplied directory, and
     // `readOnlyHint` is what a host reads when deciding to skip its approval
     // prompt. Not destructive either — `uniquePath` always picks a filename
@@ -71,16 +103,24 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
         .enum(['original', 'large'])
         .describe("Which stored rendition to fetch. Defaults to 'original' (full quality, and the only one a PDF receipt has). Falls back to the other rendition when the requested one is absent.")
         .optional(),
+      inline: z
+        .boolean()
+        .describe(`Return the receipt bytes in the result — an image block for images, an embedded resource for PDFs and everything else. Only for receipts under ${MAX_INLINE_BYTES} bytes.`)
+        .optional(),
+      extract_text: z
+        .boolean()
+        .describe("Also return the PDF's text layer as `text`. Ideal for looking up line items or totals without transferring the file. PDFs only; a scanned receipt has no text layer to extract.")
+        .optional(),
       output_dir: z
         .string()
         .describe('Directory to write the receipt into. Defaults to $SPLITWISE_OUTPUT_DIR, else the current working directory.')
         .optional(),
-      inline: z
+      write: z
         .boolean()
-        .describe(`Also return the receipt as a base64 image in the result. Image receipts only, and only under ${MAX_INLINE_BYTES} bytes.`)
+        .describe('Write the receipt to disk. Defaults to true. Pass false when the caller cannot reach this server\'s filesystem, or when the server runs read-only.')
         .optional(),
     },
-  }, async ({ id, size, output_dir, inline }) => {
+  }, async ({ id, size, inline, extract_text, output_dir, write }) => {
     const wanted: ReceiptSize = size ?? 'original';
     const fallback: ReceiptSize = wanted === 'original' ? 'large' : 'original';
 
@@ -102,15 +142,62 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
 
     const mimeType = resolveMimeType(asset.contentType, asset.bytes);
     const base64 = Buffer.from(asset.bytes).toString('base64');
-    const path = writeBinaryOutput({
-      dir: resolveOutputDir(output_dir, 'SPLITWISE_OUTPUT_DIR'),
-      baseName: `splitwise-receipt-${id}`,
-      base64,
-      extension: extensionFor(mimeType, url),
-    });
 
-    const imageMime = mimeType?.startsWith('image/') ? mimeType : undefined;
-    const inlined = inline === true && imageMime !== undefined && asset.bytes.length <= MAX_INLINE_BYTES;
+    // The write is best-effort: a hosted server often runs on a read-only
+    // filesystem, and failing the whole call there would strand a caller who
+    // only wanted the content. Report it and carry on — unless nothing else
+    // was requested, in which case there is no result to return (below).
+    let path: string | undefined;
+    let writeError: string | undefined;
+    if (write !== false) {
+      try {
+        path = writeBinaryOutput({
+          dir: resolveOutputDir(output_dir, 'SPLITWISE_OUTPUT_DIR'),
+          baseName: `splitwise-receipt-${id}`,
+          base64,
+          extension: extensionFor(mimeType, url),
+        });
+      } catch (err) {
+        writeError = describeError(err);
+      }
+    }
+
+    const oversized = asset.bytes.length > MAX_INLINE_BYTES;
+    const inlined = inline === true && !oversized;
+
+    let text: string | undefined;
+    let textNote: string | undefined;
+    if (extract_text === true) {
+      if (mimeType !== PDF_MIME) {
+        textNote = `Text extraction covers PDFs only; this receipt is ${mimeType ?? 'of an unknown type'}.`;
+      } else {
+        try {
+          const extracted = await extractPdfText(asset.bytes);
+          if (extracted.length === 0) {
+            textNote = 'This PDF has no text layer — it is probably a scan or photo. Use inline:true to read the receipt itself.';
+          } else if (extracted.length > MAX_TEXT_CHARS) {
+            text = extracted.slice(0, MAX_TEXT_CHARS);
+            textNote = `Text truncated to the first ${MAX_TEXT_CHARS} characters.`;
+          } else {
+            text = extracted;
+          }
+        } catch (err) {
+          textNote = `Could not extract text: ${describeError(err)}`;
+        }
+      }
+    }
+
+    // Nothing reached the caller: no file, no bytes, no text. Fail loudly and
+    // name the way out rather than reporting a success with an empty result.
+    if (path === undefined && !inlined && text === undefined) {
+      const reason = writeError
+        ? `could not be written (${writeError})`
+        : 'was not written (write:false)';
+      throw new Error(
+        `The receipt for expense ${id} ${reason}, and nothing was returned in its place. ` +
+          'Re-run with inline:true for the bytes, or extract_text:true for a PDF\'s text.',
+      );
+    }
 
     const result = textResult({
       expense_id: id,
@@ -118,23 +205,29 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
       ...(served !== wanted
         ? { requested_size: wanted, note: `Expense ${id} has no ${wanted} rendition; fetched ${served}.` }
         : {}),
-      path,
+      ...(path !== undefined ? { path } : {}),
+      ...(writeError !== undefined ? { write_error: writeError } : {}),
       bytes: asset.bytes.length,
       content_type: mimeType ?? 'unknown',
       // The receipt URL itself is a signed capability, so report only its host.
       source_host: new URL(url).host,
       inline: inlined,
-      ...(inline === true && !inlined
+      ...(inline === true && oversized
         ? {
-            inline_skipped: imageMime
-              ? `Receipt is ${asset.bytes.length} bytes, over the ${MAX_INLINE_BYTES}-byte inline limit — open the file at the path above.`
-              : 'Only image receipts can be returned inline — open the file at the path above.',
+            inline_skipped: `Receipt is ${asset.bytes.length} bytes, over the ${MAX_INLINE_BYTES}-byte inline limit — fetch it with write:true and read it from disk.`,
           }
         : {}),
+      ...(text !== undefined ? { text } : {}),
+      ...(textNote !== undefined ? { text_note: textNote } : {}),
     });
 
-    if (inlined && imageMime) {
-      result.content.push(...imageResult(base64, imageMime).content);
+    if (inlined) {
+      const type = mimeType ?? 'application/octet-stream';
+      result.content.push(
+        type.startsWith('image/')
+          ? imageResult(base64, type).content[0]!
+          : resourceBlock(`splitwise://expenses/${id}/receipt`, type, base64),
+      );
     }
     return result;
   });
