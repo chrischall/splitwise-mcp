@@ -35,13 +35,24 @@ function isPdf(bytes: Uint8Array): boolean {
 }
 
 /**
- * Best-effort MIME type for the downloaded bytes: the response's Content-Type
- * when it says something useful, else the magic bytes, else undefined.
+ * Best-effort MIME type for the downloaded bytes.
+ *
+ * The magic bytes win over the declared Content-Type: the header is a hint an
+ * object store often gets wrong (`application/force-download`, `application/
+ * x-pdf`, `application/octet-stream`), while the signature describes what the
+ * bytes actually are. Sniffing only recognises the handful of formats a
+ * receipt arrives in, so anything it can't place falls back to what the server
+ * claimed — and a claim of nothing-in-particular falls back to undefined.
+ *
+ * Everything downstream reads this one value, so getting it right here is what
+ * keeps the file extension, the inline block's type, and the text-extraction
+ * gate agreeing with each other.
  */
 function resolveMimeType(contentType: string | null, bytes: Uint8Array): string | undefined {
+  const sniffed = sniffMimeBytes(bytes) ?? (isPdf(bytes) ? PDF_MIME : undefined);
+  if (sniffed) return sniffed;
   const declared = (contentType ?? '').split(';')[0]!.trim().toLowerCase();
-  if (declared && !GENERIC_TYPES.has(declared)) return declared;
-  return sniffMimeBytes(bytes) ?? (isPdf(bytes) ? PDF_MIME : undefined);
+  return declared && !GENERIC_TYPES.has(declared) ? declared : undefined;
 }
 
 /** Extension from a URL path (`…/receipt.jpg?sig=…` → `jpg`), when it has one. */
@@ -169,7 +180,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
     let textNote: string | undefined;
     if (extract_text === true) {
       if (mimeType !== PDF_MIME) {
-        textNote = `Text extraction covers PDFs only; this receipt is ${mimeType ?? 'of an unknown type'}.`;
+        textNote = `Text extraction covers PDFs only; this receipt is ${mimeType ?? 'of an unknown type'}. Use inline:true to get the bytes.`;
       } else {
         try {
           const extracted = await extractPdfText(asset.bytes);
@@ -182,7 +193,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
             text = extracted;
           }
         } catch (err) {
-          textNote = `Could not extract text: ${describeError(err)}`;
+          textNote = `Could not extract text: ${describeError(err)}. Use inline:true to get the bytes.`;
         }
       }
     }
@@ -193,9 +204,16 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
       const reason = writeError
         ? `could not be written (${writeError})`
         : 'was not written (write:false)';
+      // Say why the content the caller actually asked for is missing. Advising
+      // `inline:true` to someone who just passed it — because the PDF turned
+      // out to be a scan, or the file was over the cap — is worse than useless.
+      const detail = textNote
+        ? ` ${textNote}`
+        : inline === true && oversized
+          ? ` The receipt is ${asset.bytes.length} bytes, over the ${MAX_INLINE_BYTES}-byte inline limit, so it can only be read from disk — point output_dir somewhere writable.`
+          : ' Re-run with inline:true for the bytes, or extract_text:true for a PDF\'s text.';
       throw new Error(
-        `The receipt for expense ${id} ${reason}, and nothing was returned in its place. ` +
-          'Re-run with inline:true for the bytes, or extract_text:true for a PDF\'s text.',
+        `The receipt for expense ${id} ${reason}, and nothing was returned in its place.${detail}`,
       );
     }
 
