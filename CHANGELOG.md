@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.2.1](https://github.com/chrischall/splitwise-mcp/compare/v2.2.0...v2.2.1) (2026-08-22)
+
+
+### Bug Fixes
+
+* **receipts:** act on the [#133](https://github.com/chrischall/splitwise-mcp/issues/133) review — magic bytes, honest errors, a test that can fail ([#136](https://github.com/chrischall/splitwise-mcp/issues/136)) ([5d978d7](https://github.com/chrischall/splitwise-mcp/commit/5d978d70b5252ddaf27ea1300da60322b88be1c6))
+* **receipts:** name every blocker, suggest only the routes still open ([#138](https://github.com/chrischall/splitwise-mcp/issues/138)) ([98adaee](https://github.com/chrischall/splitwise-mcp/commit/98adaee7abc3ddbb1f1dc27db2e1f04ce2fb2e22))
+* **receipts:** return receipt content to the caller, not just a server path ([#133](https://github.com/chrischall/splitwise-mcp/issues/133)) ([3077509](https://github.com/chrischall/splitwise-mcp/commit/3077509218d8d8e99b5f41c505c00ff969eedc67))
+
 ## [2.2.0](https://github.com/chrischall/splitwise-mcp/compare/v2.1.6...v2.2.0) (2026-08-22)
 
 
