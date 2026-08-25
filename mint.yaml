@@ -1,0 +1,18 @@
+version: 1
+name: Splitwise
+slug: splitwise
+summary: >-
+  Splitwise expenses, groups and friends. Bearer/API-key auth against the
+  documented REST API — no browser bridge, so it hosts on any tier.
+env:
+  - name: SPLITWISE_API_KEY
+    secret: true
+    required: true
+    help: >-
+      Your Splitwise API key, from https://secure.splitwise.com/apps — register
+      an app and copy its API key.
+egress:
+  allow:
+    # The Splitwise REST API (https://secure.splitwise.com/api/v3.0) — the only
+    # host this server contacts.
+    - secure.splitwise.com
