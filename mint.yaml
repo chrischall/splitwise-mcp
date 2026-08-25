@@ -9,8 +9,8 @@ env:
     secret: true
     required: true
     help: >-
-      Your Splitwise API key, from https://secure.splitwise.com/apps — register
-      an app and copy its API key.
+      Your Splitwise API key. Register an app at
+      https://secure.splitwise.com/apps/register and copy its API key.
 egress:
   allow:
     # The Splitwise REST API (https://secure.splitwise.com/api/v3.0) — the only
