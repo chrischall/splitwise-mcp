@@ -190,7 +190,7 @@ Add to Claude Desktop config:
 ## Development
 
 ```bash
-npm test        # run the test suite (vitest)
+npm test        # tsc typecheck + run the test suite (vitest)
 npm run build   # compile TypeScript -> dist/
 ```
 
