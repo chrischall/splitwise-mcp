@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.2.2](https://github.com/chrischall/splitwise-mcp/compare/v2.2.1...v2.2.2) (2026-08-27)
+
+
+### Documentation
+
+* npm test now typechecks before running vitest ([#147](https://github.com/chrischall/splitwise-mcp/issues/147)) ([e8bfa21](https://github.com/chrischall/splitwise-mcp/commit/e8bfa21a2dd91d4644213315cf4e50e26a9d8640))
+* **readme:** npm test now typechecks before running vitest ([#150](https://github.com/chrischall/splitwise-mcp/issues/150)) ([4ccedde](https://github.com/chrischall/splitwise-mcp/commit/4ccedde9f2091cff7af527e26abf48d11226f894))
+
 ## [2.2.1](https://github.com/chrischall/splitwise-mcp/compare/v2.2.0...v2.2.1) (2026-08-22)
 
 
