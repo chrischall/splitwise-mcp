@@ -13,6 +13,15 @@ env:
       https://secure.splitwise.com/apps/register and copy its API key.
 egress:
   allow:
-    # The Splitwise REST API (https://secure.splitwise.com/api/v3.0) — the only
-    # host this server contacts.
+    # Only hosts the SERVER process actually fetches. Hosts that appear
+    # solely in a URL this server BUILDS and returns are excluded.
+    #
+    # The Splitwise REST API (https://secure.splitwise.com/api/v3.0) — every
+    # tool but sw_get_receipt talks only to this host.
     - secure.splitwise.com
+    # sw_get_receipt fetches the receipt URL the API hands back, which lives at
+    # https://www.splitwise.com/api/v4.0/expenses/{id}/receipt (checked live
+    # 2026-08-28) and 302s to the presigned S3 object below. The child's fetch
+    # follows that redirect, so each hop is its own CONNECT and must be listed.
+    - www.splitwise.com
+    - splitwise.s3.amazonaws.com
