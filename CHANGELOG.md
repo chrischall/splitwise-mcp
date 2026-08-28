@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.2.3](https://github.com/chrischall/splitwise-mcp/compare/v2.2.2...v2.2.3) (2026-08-28)
+
+
+### Bug Fixes
+
+* **egress:** declare every host the server dials in mint.yaml ([#151](https://github.com/chrischall/splitwise-mcp/issues/151)) ([2596f0a](https://github.com/chrischall/splitwise-mcp/commit/2596f0a0cc0e0609c43b120d0dfadfa92ca059c9))
+
 ## [2.2.2](https://github.com/chrischall/splitwise-mcp/compare/v2.2.1...v2.2.2) (2026-08-27)
 
 
