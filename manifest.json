@@ -157,6 +157,10 @@
     {
       "name": "sw_get_categories",
       "description": "List expense categories"
+    },
+    {
+      "name": "sw_healthcheck",
+      "description": "Verify credentials and Splitwise reachability: resolves the API key the way real tools do, makes one authenticated call, and reports whether a key resolved, whether Splitwise accepted it, and a hint telling those apart."
     }
   ],
   "compatibility": {

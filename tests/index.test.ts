@@ -4,6 +4,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { client } from '../src/client.js';
 import { registerUserTools } from '../src/tools/user.js';
+import { registerHealthcheckTools } from '../src/tools/healthcheck.js';
 import { registerGroupTools } from '../src/tools/groups.js';
 import { registerFriendTools } from '../src/tools/friends.js';
 import { registerExpenseTools } from '../src/tools/expenses.js';
@@ -18,6 +19,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const expected = [
   'sw_get_current_user', 'sw_get_user', 'sw_update_user',
+  'sw_healthcheck',
   'sw_list_groups', 'sw_get_group', 'sw_create_group', 'sw_add_user_to_group', 'sw_remove_user_from_group',
   'sw_delete_group', 'sw_undelete_group',
   'sw_list_friends', 'sw_create_friend', 'sw_delete_friend',
@@ -39,6 +41,7 @@ describe('tool registry', () => {
       registerExpenseTools(server, client);
       registerReceiptTools(server, client);
       registerUtilityTools(server, client);
+      registerHealthcheckTools(server, client);
     });
     registered = (await harness.listTools()).map((t) => t.name);
   });
