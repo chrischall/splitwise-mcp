@@ -124,6 +124,7 @@ Add to Claude Desktop config:
 | Tool | What it does |
 |------|-------------|
 | `sw_get_current_user` | Get the authenticated user's profile |
+| `sw_healthcheck` | Verify the API key and Splitwise reachability; says which of the two failed |
 | `sw_get_user` | Get another user's profile by ID |
 | `sw_update_user` | Update the current user's profile fields |
 
@@ -202,6 +203,7 @@ src/
   index.ts          MCP server entry point
   tools/
     user.ts         sw_get_current_user, sw_get_user
+    healthcheck.ts  sw_healthcheck
     groups.ts       group CRUD and membership
     friends.ts      friend list and management
     expenses.ts     expense CRUD

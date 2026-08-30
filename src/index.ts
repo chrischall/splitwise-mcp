@@ -2,6 +2,7 @@
 import { runMcp } from '@chrischall/mcp-utils';
 import { client } from './client.js';
 import { registerUserTools } from './tools/user.js';
+import { registerHealthcheckTools } from './tools/healthcheck.js';
 import { registerGroupTools } from './tools/groups.js';
 import { registerFriendTools } from './tools/friends.js';
 import { registerExpenseTools } from './tools/expenses.js';
@@ -25,6 +26,7 @@ await runMcp({
     '[splitwise-mcp] This project was developed and is maintained by AI (Claude Sonnet 4.6). Use at your own discretion.',
   tools: [
     registerUserTools,
+    registerHealthcheckTools,
     registerGroupTools,
     registerFriendTools,
     registerExpenseTools,

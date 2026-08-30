@@ -70,6 +70,8 @@ function redactAssetQuery(err: unknown, search: string): unknown {
 
 export class SplitwiseClient {
   private readonly apiKey: string | null;
+  /** Which source supplied the API key — a LABEL, never the value. */
+  private readonly credentialSource: 'injected' | 'env' | null;
   private readonly configError: Error | null;
   private readonly api: ApiClient;
   /** Per-origin clients for asset hosts, built on first use by `fetchAsset`. */
@@ -91,6 +93,10 @@ export class SplitwiseClient {
     // blank/`undefined`/`null`/`${...}` placeholder values as unset — defends
     // against MCP hosts that pass .mcp.json env blocks through unexpanded.
     const key = opts?.apiKey ?? readEnvVar('SPLITWISE_API_KEY');
+    // Which source supplied it, for `sw_healthcheck`. Recorded here because
+    // this is the only place that knows; the key itself never leaves the
+    // class.
+    this.credentialSource = opts?.apiKey ? 'injected' : readEnvVar('SPLITWISE_API_KEY') ? 'env' : null;
     if (!key) {
       this.apiKey = null;
       this.configError = new Error('SPLITWISE_API_KEY environment variable is required');
@@ -100,6 +106,15 @@ export class SplitwiseClient {
     }
 
     this.api = this.buildApiClient(BASE_URL, true);
+  }
+
+  /**
+   * Which source supplied the API key, for `sw_healthcheck`. Returns a LABEL
+   * or `null` — deliberately never the key, since the healthcheck result is
+   * the thing people paste into a chat when something is broken.
+   */
+  describeCredential(): { source: string | null } {
+    return { source: this.credentialSource };
   }
 
   /**
