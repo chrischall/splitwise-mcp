@@ -92,11 +92,16 @@ export class SplitwiseClient {
     // back to the env var. readEnvVar trims whitespace and treats
     // blank/`undefined`/`null`/`${...}` placeholder values as unset — defends
     // against MCP hosts that pass .mcp.json env blocks through unexpanded.
-    const key = opts?.apiKey ?? readEnvVar('SPLITWISE_API_KEY');
-    // Which source supplied it, for `sw_healthcheck`. Recorded here because
-    // this is the only place that knows; the key itself never leaves the
-    // class.
-    this.credentialSource = opts?.apiKey ? 'injected' : readEnvVar('SPLITWISE_API_KEY') ? 'env' : null;
+    const injected = opts?.apiKey;
+    const key = injected ?? readEnvVar('SPLITWISE_API_KEY');
+    // Which source supplied it, for `sw_healthcheck`. Derived from the SAME
+    // `key` and `injected` bindings the resolution above uses, so the two
+    // cannot disagree. An earlier version re-tested `opts?.apiKey` for
+    // TRUTHINESS while the resolution used `??`: an injected empty string is
+    // not nullish, so `key` became `''` and the client reported a config error
+    // while the source said `env` — the healthcheck naming a source the client
+    // had not used.
+    this.credentialSource = !key ? null : injected !== undefined ? 'injected' : 'env';
     if (!key) {
       this.apiKey = null;
       this.configError = new Error('SPLITWISE_API_KEY environment variable is required');

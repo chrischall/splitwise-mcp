@@ -220,3 +220,43 @@ describe('SplitwiseClient', () => {
     );
   });
 });
+
+// describeCredential must agree with the key resolution beside it, including
+// the edge the two once disagreed on: `??` passes an injected empty string
+// through (it is not nullish), so `key` is falsy and the client is
+// unconfigured — while a truthiness test on the same input said "env".
+describe('SplitwiseClient.describeCredential', () => {
+  const saved = process.env.SPLITWISE_API_KEY;
+  beforeEach(() => {
+    delete process.env.SPLITWISE_API_KEY;
+  });
+  afterEach(() => {
+    if (saved === undefined) delete process.env.SPLITWISE_API_KEY;
+    else process.env.SPLITWISE_API_KEY = saved;
+  });
+
+  it('is null when neither an injected key nor the env var is present', () => {
+    expect(new SplitwiseClient().describeCredential()).toEqual({ source: null });
+  });
+
+  it('reports env when only the env var is set', () => {
+    process.env.SPLITWISE_API_KEY = 'k';
+    expect(new SplitwiseClient().describeCredential()).toEqual({ source: 'env' });
+  });
+
+  it('reports injected when a key is passed in', () => {
+    expect(new SplitwiseClient({ apiKey: 'k' }).describeCredential()).toEqual({ source: 'injected' });
+  });
+
+  it('reports null for an injected EMPTY key, matching the client being unconfigured', () => {
+    process.env.SPLITWISE_API_KEY = 'from-env';
+    // `??` keeps the empty string, so the client has no usable key. The source
+    // must say so rather than pointing at the env var it never consulted.
+    expect(new SplitwiseClient({ apiKey: '' }).describeCredential()).toEqual({ source: null });
+  });
+
+  it('never returns the key', () => {
+    process.env.SPLITWISE_API_KEY = 'SUPER_SECRET_KEY_VALUE';
+    expect(JSON.stringify(new SplitwiseClient().describeCredential())).not.toContain('SUPER_SECRET_KEY_VALUE');
+  });
+});
