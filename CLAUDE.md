@@ -1,6 +1,6 @@
 # splitwise-mcp
 
-MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 26 tools to Claude over stdio. Built on `@chrischall/mcp-utils` (`runMcp`, `createApiClient`, `readEnvVar`, `textResult`).
+MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 27 tools to Claude over stdio. Built on `@chrischall/mcp-utils` (`runMcp`, `createApiClient`, `readEnvVar`, `textResult`).
 
 ## Commands
 
