@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.3.0](https://github.com/chrischall/splitwise-mcp/compare/v2.2.3...v2.3.0) (2026-08-30)
+
+
+### Features
+
+* add sw_healthcheck ([#155](https://github.com/chrischall/splitwise-mcp/issues/155)) ([da70be1](https://github.com/chrischall/splitwise-mcp/commit/da70be1346d6ce16c40713cf9c5ab522932b4f5b))
+
+
+### Bug Fixes
+
+* derive credentialSource from the same resolution the key uses ([#158](https://github.com/chrischall/splitwise-mcp/issues/158)) ([ac397ab](https://github.com/chrischall/splitwise-mcp/commit/ac397ab43cd9960cff08bc8a8ab58b5c07300d9f)), closes [#156](https://github.com/chrischall/splitwise-mcp/issues/156)
+
 ## [2.2.3](https://github.com/chrischall/splitwise-mcp/compare/v2.2.2...v2.2.3) (2026-08-28)
 
 
