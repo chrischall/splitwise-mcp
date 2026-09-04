@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.4.0](https://github.com/chrischall/splitwise-mcp/compare/v2.3.0...v2.4.0) (2026-09-04)
+
+
+### Features
+
+* **tools:** compact by default — sw_list_groups no longer exceeds the result limit ([#169](https://github.com/chrischall/splitwise-mcp/issues/169)) ([8e61358](https://github.com/chrischall/splitwise-mcp/commit/8e61358840ad57549e883c80dcf8ee439b6e9bdc))
+
+
+### Bug Fixes
+
+* **build:** restore the literal em dash in the package description ([#173](https://github.com/chrischall/splitwise-mcp/issues/173)) ([768d24d](https://github.com/chrischall/splitwise-mcp/commit/768d24d4f5d90dc396b70fadd4ec4cccf54d820f))
+* **deps:** pick up @chrischall/mcp-utils 0.23.2 ([#175](https://github.com/chrischall/splitwise-mcp/issues/175)) ([61c9de2](https://github.com/chrischall/splitwise-mcp/commit/61c9de28c05400f0f5f1e196009049fcf1e16f68))
+* **tools:** stop promising first_name/last_name the compact default does not return ([#176](https://github.com/chrischall/splitwise-mcp/issues/176)) ([4a179c2](https://github.com/chrischall/splitwise-mcp/commit/4a179c277c3acbd0e54cfd88033f73c171a6520b))
+
 ## [2.3.0](https://github.com/chrischall/splitwise-mcp/compare/v2.2.3...v2.3.0) (2026-08-30)
 
 
