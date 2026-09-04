@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SW_VIEWS, viewFriends } from '../project.js';
+import { PERSON_VIEW_NOTE, SW_VIEWS, viewFriends } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { minifiedResult, pruneUndefined, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
@@ -7,10 +7,10 @@ import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
 export function registerFriendTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool('sw_list_friends', {
-    description: "List all Splitwise friends with their id, first_name, last_name, and email. Use this to resolve a friend's name to a user_id before adding them to a group or building a custom expense split.",
+    description: "List all Splitwise friends. Use this to resolve a friend's name to a user_id before adding them to a group or building a custom expense split. The compact default returns id, name (first_name + last_name joined), email, registration_status and any non-empty balance per friend; pass view:'full' for Splitwise's raw records, which keep first_name and last_name separate.",
     annotations: { readOnlyHint: true },
     inputSchema: {
-      view: viewParam(SW_VIEWS, { note: 'compact drops the avatar URLs; "full" returns Splitwise\'s whole record.' }),
+      view: viewParam(SW_VIEWS, { note: PERSON_VIEW_NOTE }),
     },
   }, async ({ view }) => {
     const data = await client.request('GET', '/get_friends');
