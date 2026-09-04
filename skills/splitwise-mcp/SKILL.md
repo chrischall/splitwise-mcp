@@ -71,13 +71,13 @@ API key auth — no login flow or token rotation. The key is attached to every r
 ### User
 | Tool | Description |
 |------|-------------|
-| `sw_get_current_user` | Get the authenticated user's profile (`id`, `first_name`, `last_name`, `email`) |
+| `sw_get_current_user(view?)` | Get the authenticated user's profile. On the default `compact` rung that is `id`, `name` (first + last joined), `email`, `registration_status`, `balance`; `first_name` / `last_name` separately are on `view: "full"` |
 
 ### Groups
 | Tool | Description |
 |------|-------------|
-| `sw_list_groups` | List all groups with `id`, `name`, and `members[]` |
-| `sw_get_group(id)` | Get a single group's details including members and balances |
+| `sw_list_groups(view?)` | List all groups with `id`, `name`, `group_type`, `members[]`, `simplified_debts` and `invite_link`. See [Response shape](#response-shape-view) — this is the response that does not fit at all on `full` |
+| `sw_get_group(id, view?)` | Get a single group's details including members and balances |
 | `sw_create_group(name, group_type?, simplify_by_default?)` | Create a new group (`group_type`: `apartment`, `house`, `trip`, `other`) |
 | `sw_add_user_to_group(group_id, user_id?)` | Add a user by `user_id` (preferred) or `first_name` + `last_name` + `email` |
 | `sw_remove_user_from_group(group_id, user_id)` | Remove a user from a group |
@@ -85,13 +85,13 @@ API key auth — no login flow or token rotation. The key is attached to every r
 ### Friends
 | Tool | Description |
 |------|-------------|
-| `sw_list_friends` | List all friends with `id`, `first_name`, `last_name`, `email` |
+| `sw_list_friends(view?)` | List all friends. On the default `compact` rung each is `id`, `name` (first + last joined), `email`, `registration_status`, `balance`; the separate name fields are on `view: "full"` |
 
 ### Expenses
 | Tool | Description |
 |------|-------------|
-| `sw_list_expenses(group_id?, friend_id?, dated_after?, dated_before?, limit?, offset?)` | List or search expenses |
-| `sw_get_expense(id)` | Get full details of a single expense |
+| `sw_list_expenses(group_id?, friend_id?, dated_after?, dated_before?, limit?, offset?, view?)` | List or search expenses |
+| `sw_get_expense(id, view?)` | Get full details of a single expense |
 | `sw_create_expense(group_id, description, cost, split_equally? \| users?)` | Create an expense — equal split or custom per-person split |
 | `sw_update_expense(expense_id, ...)` | Edit an existing expense (custom split requires full `users` array) |
 | `sw_delete_expense(id)` | Soft-delete an expense |
@@ -105,9 +105,80 @@ API key auth — no login flow or token rotation. The key is attached to every r
 ### Utilities
 | Tool | Description |
 |------|-------------|
-| `sw_get_notifications` | Recent activity feed for the current user |
+| `sw_get_notifications(view?)` | Recent activity feed for the current user |
 | `sw_get_categories` | Hierarchical list of expense categories (use `id` as `category_id`) |
 | `sw_get_currencies` | List of supported currency codes |
+
+## Response shape (`view`)
+
+Nine read tools take `view: "compact" | "full"`, and **`compact` is the
+default** — you get the slim rung without asking. Two of them are not in the
+table above: `sw_get_user(id, view?)` and `sw_get_comments(expense_id, view?)`.
+
+This is not a nicety. A live `sw_list_groups` on a 51-group account came back
+as **192,123 characters and was REFUSED by the host before the model saw a byte
+of it** — the tool was not expensive, it was unusable. 60% of that response was
+image URLs: `avatar` + `tall_avatar` + `cover_photo` (51.7 KB) and a `picture`
+object per member across 51 groups (37.7 KB). Stripping media alone takes it to
+51.4 KB (−73%); the field projections below take it to 29.3 KB.
+
+**Compact means two different things here, depending on the tool.**
+
+**A hand-written field projection** — `sw_list_groups`, `sw_get_group`,
+`sw_list_friends`, `sw_get_current_user`, `sw_get_user`, `sw_list_expenses`,
+`sw_get_expense`:
+
+- **A person becomes `{id, name, email, registration_status, balance}`, and
+  `name` is `first_name` + `last_name` JOINED.** This is the one that will trip
+  you: reach for `last_name` on the default rung and it is not there. `balance`
+  survives because it is the whole reason to look a person up, and
+  `registration_status` because it is how you know an invite was never
+  accepted.
+- **A group keeps** `{id, name, group_type, updated_at, members[],
+  simplified_debts, invite_link}`. The whiteboard fields and the
+  `simplify_by_default` / `custom_avatar` / `group_reminders` settings go —
+  nothing here reads them. `original_debts` goes because `simplified_debts`
+  answers "who owes whom", and the two differ only when simplification is on;
+  `full` has both.
+- **An expense keeps the share breakdown**, as `{id, name, paid_share,
+  owed_share, net_balance}` per person rather than Splitwise's nested `user`
+  object, plus `repayments`, `comments_count` and `category` as a name. Two
+  details matter: `deleted_at` is kept **only when set**, because a deleted
+  expense still comes back from the list endpoint and a caller who cannot see
+  it will count it; and the receipt becomes `has_receipt: true` — the bytes
+  come from `sw_get_receipt`. The eleven-field repeat/reminder/transaction
+  block goes (`repeats`, `next_repeat`, `transaction_status`, …) — it was
+  `false` / `null` / `"offline"` on every expense in a live account.
+
+**Media stripping, with no field projection claimed** — `sw_get_notifications`
+and `sw_get_comments`. Compact drops the avatar URLs and touches nothing else.
+Do not expect a named field set from these two; expect the same records minus
+the pictures.
+
+`view: "full"` returns Splitwise's records untouched, everywhere. There is **no
+`raw` rung**: `full` already IS the upstream payload, so a third value could
+only alias it.
+
+**A projection that trips returns the rows WHOLE**, and for the entire array
+rather than per record — one odd record projected to nothing among fifty good
+ones is a hole in the middle of an answer, and indistinguishable from an
+expense with no content. So a fat response is a possible outcome; a quietly
+gappy one is not.
+
+The other eighteen tools take no `view`, each for its own reason:
+
+- **`sw_get_receipt`** is the one tool the media rung is documented never to
+  touch: its PRODUCT is the image. Stripping there would not shrink the answer,
+  it would delete it.
+- **`sw_get_categories` and `sw_get_currencies`** are static reference lists —
+  already narrow, no media, and every field on them is the answer.
+- **`sw_healthcheck`** answers reachability and auth.
+- **The fourteen writes** (`sw_create_expense`, `sw_update_expense`,
+  `sw_delete_expense`, `sw_undelete_expense`, `sw_create_group`,
+  `sw_delete_group`, `sw_undelete_group`, `sw_add_user_to_group`,
+  `sw_remove_user_from_group`, `sw_create_friend`, `sw_delete_friend`,
+  `sw_create_comment`, `sw_delete_comment`, `sw_update_user`) return receipts —
+  an id, a status — with nothing to strip and everything to keep.
 
 ## Workflows
 
