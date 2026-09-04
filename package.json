@@ -2,7 +2,7 @@
   "name": "splitwise-mcp",
   "version": "2.3.0",
   "mcpName": "io.github.chrischall/splitwise-mcp",
-  "description": "Splitwise MCP server for Claude \u2014 developed and maintained by AI (Claude Code)",
+  "description": "Splitwise MCP server for Claude — developed and maintained by AI (Claude Code)",
   "author": "Claude Code (AI) <https://www.anthropic.com/claude>",
   "repository": {
     "type": "git",
