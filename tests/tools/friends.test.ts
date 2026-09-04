@@ -24,7 +24,10 @@ describe('friend tools', () => {
       const result = await harness.callTool('sw_list_friends');
 
       expect(mockRequest).toHaveBeenCalledWith('GET', '/get_friends');
-      expect((result.content[0] as { text: string }).text).toContain('"first_name": "Meredith"');
+      // Parsed, not substring-matched: the response is minified now, and
+      // compact folds first_name/last_name into one `name`.
+      const body = JSON.parse((result.content[0] as { text: string }).text);
+      expect(body.friends[0]).toMatchObject({ id: 7, name: 'Meredith' });
     });
   });
 

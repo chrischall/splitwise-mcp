@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
-  textResult,
+  minifiedResult,
   imageResult,
   resolveOutputDir,
   writeBinaryOutput,
@@ -246,7 +246,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
       );
     }
 
-    const result = textResult({
+    const result = minifiedResult({
       expense_id: id,
       size: served,
       ...(served !== wanted

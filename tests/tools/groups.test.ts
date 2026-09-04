@@ -42,7 +42,7 @@ describe('group tools', () => {
       mockRequest.mockResolvedValue({ group: { id: 42 } });
       const result = await harness.callTool('sw_get_group', { id: 42 });
       expect(mockRequest).toHaveBeenCalledWith('GET', '/get_group/42');
-      expect((result.content[0] as { text: string }).text).toContain('"id": 42');
+      expect(JSON.parse((result.content[0] as { text: string }).text).group.id).toBe(42);
     });
   });
 

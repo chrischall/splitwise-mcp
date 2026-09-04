@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { SW_VIEWS, viewGroup, viewGroups } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { textResult, pruneUndefined } from '@chrischall/mcp-utils';
+import { minifiedResult, pruneUndefined, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
@@ -8,20 +9,24 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
   server.registerTool('sw_list_groups', {
     description: 'List all Splitwise groups the current user belongs to. Returns id, name, and members for each group. Use this to resolve a group name to its id.',
     annotations: { readOnlyHint: true },
-  }, async () => {
+    inputSchema: {
+      view: viewParam(SW_VIEWS, { note: 'compact drops the avatar/cover-photo URLs (60% of a live 51-group response, which does not fit in a tool result at all) and the whiteboard/reminder settings; "full" returns Splitwise\'s whole records.' }),
+    },
+  }, async ({ view }) => {
     const data = await client.request('GET', '/get_groups');
-    return textResult(data);
+    return minifiedResult(viewGroups(resolveView(view, SW_VIEWS), data));
   });
 
   server.registerTool('sw_get_group', {
     description: 'Get details of a single Splitwise group including all members and balances.',
     annotations: { readOnlyHint: true },
     inputSchema: {
+      view: viewParam(SW_VIEWS, { note: 'compact drops the avatar/cover-photo URLs (60% of a live 51-group response, which does not fit in a tool result at all) and the whiteboard/reminder settings; "full" returns Splitwise\'s whole records.' }),
       id: z.number().describe('Group ID'),
     },
-  }, async ({ id }) => {
+  }, async ({ id, view }) => {
     const data = await client.request('GET', `/get_group/${id}`);
-    return textResult(data);
+    return minifiedResult(viewGroup(resolveView(view, SW_VIEWS), data));
   });
 
   server.registerTool('sw_create_group', {
@@ -38,7 +43,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     const gate = previewUnlessConfirmed(confirm, `Create Splitwise group "${name}"`, 'POST', '/create_group', body);
     if (gate) return gate;
     const data = await client.request('POST', '/create_group', body);
-    return textResult(data);
+    return minifiedResult(data);
   });
 
   server.registerTool('sw_add_user_to_group', {
@@ -64,7 +69,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     const gate = previewUnlessConfirmed(confirm, `Add a user to Splitwise group ${group_id} (may send an invite email)`, 'POST', '/add_user_to_group', body);
     if (gate) return gate;
     const data = await client.request('POST', '/add_user_to_group', body);
-    return textResult(data);
+    return minifiedResult(data);
   });
 
   server.registerTool('sw_remove_user_from_group', {
@@ -79,7 +84,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     const gate = previewUnlessConfirmed(confirm, `Remove user ${user_id} from Splitwise group ${group_id}`, 'POST', '/remove_user_from_group', { group_id, user_id });
     if (gate) return gate;
     const data = await client.request('POST', '/remove_user_from_group', { group_id, user_id });
-    return textResult(data);
+    return minifiedResult(data);
   });
 
   server.registerTool('sw_delete_group', {
@@ -93,7 +98,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     const gate = previewUnlessConfirmed(confirm, `Soft-delete Splitwise group ${id}`, 'POST', `/delete_group/${id}`);
     if (gate) return gate;
     const data = await client.request('POST', `/delete_group/${id}`);
-    return textResult(data);
+    return minifiedResult(data);
   });
 
   server.registerTool('sw_undelete_group', {
@@ -103,6 +108,6 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     },
   }, async ({ id }) => {
     const data = await client.request('POST', `/undelete_group/${id}`);
-    return textResult(data);
+    return minifiedResult(data);
   });
 }

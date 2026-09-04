@@ -1,5 +1,5 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { schemaConfirm, textResult } from '@chrischall/mcp-utils';
+import { schemaConfirm, minifiedResult } from '@chrischall/mcp-utils';
 
 export { schemaConfirm };
 
@@ -18,7 +18,7 @@ export function previewUnlessConfirmed(
   body?: unknown,
 ): CallToolResult | null {
   if (confirm === true) return null;
-  return textResult({
+  return minifiedResult({
     dryRun: true,
     action,
     method,
