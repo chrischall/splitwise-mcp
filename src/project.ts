@@ -43,11 +43,25 @@ function nameOf(user: Dict | undefined): string | undefined {
 }
 
 /**
+ * What `compact` does to a person, in the words the caller sees.
+ *
+ * It lives here rather than at the three call sites because it is a
+ * description of `compactPerson` below — and the note it replaced described
+ * something else entirely: "compact drops the avatar URLs" is `viewGeneric`'s
+ * behaviour (`sw_get_notifications`, `sw_get_comments`), not this projection's.
+ * This one keeps five fields and MERGES first_name + last_name into `name`,
+ * which is a good deal more than dropping an avatar and is the part a caller
+ * has to know before it goes looking for `last_name`.
+ */
+export const PERSON_VIEW_NOTE =
+  'compact returns {id, name, email, registration_status, balance} per person — `name` is first_name + last_name joined, so the separate fields are on "full" only; "full" returns Splitwise\'s whole record.';
+
+/**
  * One member or friend. `balance` survives — it is the whole reason to look a
  * person up — and so does `registration_status`, which is how a caller knows
  * an invite has not been accepted.
  */
-function compactPerson(raw: unknown): Dict {
+export function compactPerson(raw: unknown): Dict {
   const u = asDict(raw) ?? {};
   // `pruneUndefined`, so an optional field is ABSENT rather than
   // present-and-undefined: "not reported" and "none" have to stay different

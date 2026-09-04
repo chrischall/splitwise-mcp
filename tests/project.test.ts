@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { compactGroup, compactExpense, viewGroups, viewExpenses, viewGeneric, SW_VIEWS } from '../src/project.js';
+import { compactGroup, compactExpense, compactPerson, viewFriends, viewUser, viewGroups, viewExpenses, viewGeneric, PERSON_VIEW_NOTE, SW_VIEWS } from '../src/project.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -27,6 +27,83 @@ const LIVE_GROUP = {
   custom_avatar: false,
   cover_photo: { xxlarge: 'https://s3/g5.png' },
 };
+
+/** The shape a live `GET /get_friends` entry actually returns. */
+const LIVE_FRIEND = {
+  id: 88065463,
+  first_name: 'Alison',
+  last_name: 'Hall',
+  email: 'a@example.com',
+  registration_status: 'confirmed',
+  picture: { small: 'https://s3/a.png', medium: 'https://s3/b.png', large: 'https://s3/c.png' },
+  custom_picture: false,
+  balance: [{ currency_code: 'USD', amount: '-6.25' }],
+  groups: [{ group_id: 64856400, balance: [] }],
+  updated_at: '2026-09-04T11:48:09Z',
+};
+
+// This projection had no direct test, and that is how the two tool
+// descriptions came to promise `first_name` / `last_name` that compact does
+// not return. The key set is the contract now.
+describe('compactPerson', () => {
+  it('returns exactly {id, name, email, registration_status, balance}', () => {
+    expect(Object.keys(compactPerson(LIVE_FRIEND)).sort())
+      .toEqual(['balance', 'email', 'id', 'name', 'registration_status']);
+  });
+
+  it('MERGES first_name + last_name into name, and does not keep either', () => {
+    const out = compactPerson(LIVE_FRIEND);
+    expect(out.name).toBe('Alison Hall');
+    expect(out).not.toHaveProperty('first_name');
+    expect(out).not.toHaveProperty('last_name');
+  });
+
+  it('omits name entirely rather than emitting an empty string when neither name is set', () => {
+    // "not reported" and "" are different facts; `pruneUndefined` keeps them so.
+    expect(compactPerson({ id: 1, email: 'x@example.com' })).not.toHaveProperty('name');
+    expect(compactPerson({ id: 1, first_name: '', last_name: '' })).not.toHaveProperty('name');
+  });
+
+  it('keeps just one of the pair when that is all Splitwise sent', () => {
+    expect(compactPerson({ id: 1, first_name: 'Alison' }).name).toBe('Alison');
+    expect(compactPerson({ id: 1, last_name: 'Hall' }).name).toBe('Hall');
+  });
+
+  it('drops the picture URLs a model cannot see', () => {
+    const text = JSON.stringify(compactPerson(LIVE_FRIEND));
+    expect(text).not.toContain('picture');
+    expect(text).not.toContain('s3');
+  });
+
+  it('omits an empty balance rather than reporting []', () => {
+    // A settled friend and a friend whose balance was not reported are not the
+    // same fact, and `[]` reads as the first.
+    expect(compactPerson({ ...LIVE_FRIEND, balance: [] })).not.toHaveProperty('balance');
+    expect(compactPerson(LIVE_FRIEND).balance).toEqual(LIVE_FRIEND.balance);
+  });
+
+  it('survives a non-object without throwing', () => {
+    expect(compactPerson(null)).toEqual({});
+  });
+
+  it('backs viewFriends and viewUser, so both tools answer in the same shape', () => {
+    const fromList = (viewFriends('compact', { friends: [LIVE_FRIEND] }) as { friends: Record<string, unknown>[] }).friends[0];
+    const fromOne = (viewUser('compact', { user: LIVE_FRIEND }) as { user: Record<string, unknown> }).user;
+    expect(fromList).toEqual(fromOne);
+    expect(fromOne).toEqual(compactPerson(LIVE_FRIEND));
+  });
+});
+
+// The description mismatch this issue is about was a claim in prose drifting
+// from a projection in code. Pin the two together.
+describe('PERSON_VIEW_NOTE', () => {
+  it('names every field compact actually returns, and no field it does not', () => {
+    for (const key of Object.keys(compactPerson(LIVE_FRIEND))) {
+      expect(PERSON_VIEW_NOTE).toContain(key);
+    }
+    expect(PERSON_VIEW_NOTE).toContain('first_name + last_name joined');
+  });
+});
 
 describe('compactGroup', () => {
   it('drops every image URL — 60% of a live 51-group response was exactly these', () => {
