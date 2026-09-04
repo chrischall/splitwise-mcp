@@ -25,7 +25,7 @@ describe('user tools', () => {
 
       expect(mockRequest).toHaveBeenCalledWith('GET', '/get_current_user');
       expect(result.isError).toBeFalsy();
-      expect((result.content[0] as { text: string }).text).toContain('"id": 123');
+      expect(JSON.parse((result.content[0] as { text: string }).text).user.id).toBe(123);
     });
   });
 
@@ -36,7 +36,7 @@ describe('user tools', () => {
       const result = await harness.callTool('sw_get_user', { id: 42 });
       expect(mockRequest).toHaveBeenCalledWith('GET', '/get_user/42');
       expect(result.isError).toBeFalsy();
-      expect((result.content[0] as { text: string }).text).toContain('"id": 42');
+      expect(JSON.parse((result.content[0] as { text: string }).text).user.id).toBe(42);
     });
   });
 

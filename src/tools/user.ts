@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { SW_VIEWS, viewUser } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { textResult, pruneUndefined } from '@chrischall/mcp-utils';
+import { minifiedResult, pruneUndefined, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
@@ -8,20 +9,24 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
   server.registerTool('sw_get_current_user', {
     description: "Get the authenticated Splitwise user's profile (id, first_name, last_name, email). Use the returned id when building custom expense splits.",
     annotations: { readOnlyHint: true },
-  }, async () => {
+    inputSchema: {
+      view: viewParam(SW_VIEWS, { note: 'compact drops the avatar URLs; "full" returns Splitwise\'s whole record.' }),
+    },
+  }, async ({ view }) => {
     const data = await client.request('GET', '/get_current_user');
-    return textResult(data);
+    return minifiedResult(viewUser(resolveView(view, SW_VIEWS), data));
   });
 
   server.registerTool('sw_get_user', {
     description: "Get another Splitwise user's profile by id.",
     annotations: { readOnlyHint: true },
     inputSchema: {
+      view: viewParam(SW_VIEWS, { note: 'compact drops the avatar URLs; "full" returns Splitwise\'s whole record.' }),
       id: z.number().describe('User ID'),
     },
-  }, async ({ id }) => {
+  }, async ({ id, view }) => {
     const data = await client.request('GET', `/get_user/${id}`);
-    return textResult(data);
+    return minifiedResult(viewUser(resolveView(view, SW_VIEWS), data));
   });
 
   server.registerTool('sw_update_user', {
@@ -43,6 +48,6 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
     const gate = previewUnlessConfirmed(confirm, `Update current Splitwise user ${id} profile`, 'POST', `/update_user/${id}`, previewBody);
     if (gate) return gate;
     const data = await client.request('POST', `/update_user/${id}`, body);
-    return textResult(data);
+    return minifiedResult(data);
   });
 }

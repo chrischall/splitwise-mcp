@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { SW_VIEWS, viewExpense, viewExpenses } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { textResult, buildQueryString } from '@chrischall/mcp-utils';
+import { buildQueryString, minifiedResult, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
 
@@ -57,6 +58,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     description: 'List or search Splitwise expenses. All filters are optional. Use group_id to filter by group, dated_after/dated_before for date ranges.',
     annotations: { readOnlyHint: true },
     inputSchema: {
+      view: viewParam(SW_VIEWS, { note: 'compact keeps the share breakdown, repayments and receipt presence and drops the avatars and the repeat/reminder/transaction block; "full" returns Splitwise\'s whole records.' }),
       group_id: z.number().describe('Only expenses in this group').optional(),
       friend_id: z.number().describe('Only expenses with this friend').optional(),
       dated_after: z.string().describe('ISO 8601 date — only expenses on or after this date').optional(),
@@ -78,18 +80,19 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
       offset: args.offset,
     });
     const data = await client.request('GET', `/get_expenses${qs}`);
-    return textResult(data);
+    return minifiedResult(viewExpenses(resolveView(args.view, SW_VIEWS), data));
   });
 
   server.registerTool('sw_get_expense', {
     description: 'Get full details of a single Splitwise expense by id.',
     annotations: { readOnlyHint: true },
     inputSchema: {
+      view: viewParam(SW_VIEWS, { note: 'compact keeps the share breakdown, repayments and receipt presence and drops the avatars and the repeat/reminder/transaction block; "full" returns Splitwise\'s whole records.' }),
       id: z.number().describe('Expense ID'),
     },
-  }, async ({ id }) => {
+  }, async ({ id, view }) => {
     const data = await client.request('GET', `/get_expense/${id}`);
-    return textResult(data);
+    return minifiedResult(viewExpense(resolveView(view, SW_VIEWS), data));
   });
 
   server.registerTool('sw_create_expense', {
@@ -111,7 +114,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     const gate = previewUnlessConfirmed(args.confirm, `Create a Splitwise expense "${args.description}" (${args.cost}) — notifies group members`, 'POST', '/create_expense', body);
     if (gate) return gate;
     const data = await client.request('POST', '/create_expense', body);
-    return textResult(data);
+    return minifiedResult(data);
   });
 
   server.registerTool('sw_update_expense', {
@@ -134,7 +137,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     const gate = previewUnlessConfirmed(args.confirm, `Update Splitwise expense ${expense_id} — notifies group members`, 'POST', `/update_expense/${expense_id}`, body);
     if (gate) return gate;
     const data = await client.request('POST', `/update_expense/${expense_id}`, body);
-    return textResult(data);
+    return minifiedResult(data);
   });
 
   server.registerTool('sw_delete_expense', {
@@ -148,7 +151,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     const gate = previewUnlessConfirmed(confirm, `Soft-delete Splitwise expense ${id}`, 'POST', `/delete_expense/${id}`);
     if (gate) return gate;
     const data = await client.request('POST', `/delete_expense/${id}`);
-    return textResult(data);
+    return minifiedResult(data);
   });
 
   server.registerTool('sw_undelete_expense', {
@@ -158,6 +161,6 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     },
   }, async ({ id }) => {
     const data = await client.request('POST', `/undelete_expense/${id}`);
-    return textResult(data);
+    return minifiedResult(data);
   });
 }
