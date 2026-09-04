@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/chrischall/splitwise-mcp/compare/v2.4.0...v2.4.1) (2026-09-04)
+
+
+### Documentation
+
+* **skill:** document the `view` response-shape parameter ([#177](https://github.com/chrischall/splitwise-mcp/issues/177)) ([2c3ab64](https://github.com/chrischall/splitwise-mcp/commit/2c3ab64c0c6ecbaa7dcbbfbe17b73605d564b4e8))
+
 ## [2.4.0](https://github.com/chrischall/splitwise-mcp/compare/v2.3.0...v2.4.0) (2026-09-04)
 
 
