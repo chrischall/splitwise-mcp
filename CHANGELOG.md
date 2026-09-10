@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.4.2](https://github.com/chrischall/splitwise-mcp/compare/v2.4.1...v2.4.2) (2026-09-10)
+
+
+### Bug Fixes
+
+* **deps:** @chrischall/mcp-utils 0.26.1 ([#187](https://github.com/chrischall/splitwise-mcp/issues/187)) ([d834618](https://github.com/chrischall/splitwise-mcp/commit/d8346188f8af68ac174960c6dc996602dbff1b1d))
+* **deps:** bump hono from 4.13.0 to 4.13.7 ([#185](https://github.com/chrischall/splitwise-mcp/issues/185)) ([ea3750b](https://github.com/chrischall/splitwise-mcp/commit/ea3750ba0e6af0d3a480159c6acd7d4aeba9b0ab))
+* **deps:** declare the peer floors mcp-utils 0.26.1 requires ([#189](https://github.com/chrischall/splitwise-mcp/issues/189)) ([0f68f84](https://github.com/chrischall/splitwise-mcp/commit/0f68f84aa2b22f78b5d6fdfdd70ab948cc856ef4))
+
 ## [2.4.1](https://github.com/chrischall/splitwise-mcp/compare/v2.4.0...v2.4.1) (2026-09-04)
 
 
