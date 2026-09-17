@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.0.0](https://github.com/chrischall/splitwise-mcp/compare/v2.4.2...v3.0.0) (2026-09-17)
+
+
+### ⚠ BREAKING CHANGES
+
+* **mcp:** migrate server to SDK v2 ([#191](https://github.com/chrischall/splitwise-mcp/issues/191))
+
+### Features
+
+* **mcp:** migrate server to SDK v2 ([#191](https://github.com/chrischall/splitwise-mcp/issues/191)) ([9267abd](https://github.com/chrischall/splitwise-mcp/commit/9267abdde41aae9384756dfc4fecc5dbd99e2032))
+
+
+### Bug Fixes
+
+* **build:** preserve Zod initialization in standalone bundle ([#194](https://github.com/chrischall/splitwise-mcp/issues/194)) ([ecce567](https://github.com/chrischall/splitwise-mcp/commit/ecce56771784db0907988c5b07a61769f075161f))
+* **mcp:** restore tool indentation ([#195](https://github.com/chrischall/splitwise-mcp/issues/195)) ([a959918](https://github.com/chrischall/splitwise-mcp/commit/a959918d1a661f5fc7680f7a91b264f792f13431)), closes [#192](https://github.com/chrischall/splitwise-mcp/issues/192)
+
 ## [2.4.2](https://github.com/chrischall/splitwise-mcp/compare/v2.4.1...v2.4.2) (2026-09-10)
 
 
