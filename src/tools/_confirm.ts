@@ -1,4 +1,4 @@
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/server';
 import { schemaConfirm, minifiedResult } from '@chrischall/mcp-utils';
 
 export { schemaConfirm };
