@@ -90,7 +90,11 @@ async function extractPdfText(bytes: Uint8Array): Promise<string> {
 }
 
 /** An MCP embedded-resource block — how non-image bytes ride back in a result. */
-function resourceBlock(uri: string, mimeType: string, base64: string): CallToolResult['content'][number] {
+function resourceBlock(
+  uri: string,
+  mimeType: string,
+  base64: string,
+): CallToolResult['content'][number] {
   return { type: 'resource', resource: { uri, mimeType, blob: base64 } };
 }
 
@@ -99,188 +103,206 @@ function describeError(err: unknown): string {
 }
 
 export function registerReceiptTools(server: McpServer, client: SplitwiseClient): void {
-  server.registerTool('sw_get_receipt', {
-    description:
-      "Download the receipt image or PDF attached to a Splitwise expense. The receipt URLs returned by sw_get_expense need the server's credentials — fetching them directly returns 401 — so use this tool instead. Set inline:true to get the bytes back in the result (images AND PDFs), or extract_text:true to get a PDF's text without the binary at all — both work when the caller can't see this server's filesystem. It also writes the file and returns the path, unless write:false or the filesystem is read-only.",
-    // Not read-only: this writes a file into a caller-supplied directory, and
-    // `readOnlyHint` is what a host reads when deciding to skip its approval
-    // prompt. Not destructive either — `uniquePath` always picks a filename
-    // that doesn't exist, so an existing file is never touched.
-    annotations: { readOnlyHint: false, destructiveHint: false },
-    inputSchema: z.object({
-    id: z.number().describe('Expense ID (the same id sw_get_expense takes)'),
-    size: z
-      .enum(['original', 'large'])
-      .describe("Which stored rendition to fetch. Defaults to 'original' (full quality, and the only one a PDF receipt has). Falls back to the other rendition when the requested one is absent.")
-      .optional(),
-    inline: z
-      .boolean()
-      .describe(`Return the receipt bytes in the result — an image block for images, an embedded resource for PDFs and everything else. Only for receipts under ${MAX_INLINE_BYTES} bytes.`)
-      .optional(),
-    extract_text: z
-      .boolean()
-      .describe("Also return the PDF's text layer as `text`. Ideal for looking up line items or totals without transferring the file. PDFs only; a scanned receipt has no text layer to extract.")
-      .optional(),
-    output_dir: z
-      .string()
-      .describe('Directory to write the receipt into. Defaults to $SPLITWISE_OUTPUT_DIR, else the current working directory.')
-      .optional(),
-    write: z
-      .boolean()
-      .describe('Write the receipt to disk. Defaults to true. Pass false when the caller cannot reach this server\'s filesystem, or when the server runs read-only.')
-      .optional(),
-  }),
-  }, async ({ id, size, inline, extract_text, output_dir, write }) => {
-    const wanted: ReceiptSize = size ?? 'original';
-    const fallback: ReceiptSize = wanted === 'original' ? 'large' : 'original';
+  server.registerTool(
+    'sw_get_receipt',
+    {
+      description:
+        "Download the receipt image or PDF attached to a Splitwise expense. The receipt URLs returned by sw_get_expense need the server's credentials — fetching them directly returns 401 — so use this tool instead. Set inline:true to get the bytes back in the result (images AND PDFs), or extract_text:true to get a PDF's text without the binary at all — both work when the caller can't see this server's filesystem. It also writes the file and returns the path, unless write:false or the filesystem is read-only.",
+      // Not read-only: this writes a file into a caller-supplied directory, and
+      // `readOnlyHint` is what a host reads when deciding to skip its approval
+      // prompt. Not destructive either — `uniquePath` always picks a filename
+      // that doesn't exist, so an existing file is never touched.
+      annotations: { readOnlyHint: false, destructiveHint: false },
+      inputSchema: z.object({
+        id: z.number().describe('Expense ID (the same id sw_get_expense takes)'),
+        size: z
+          .enum(['original', 'large'])
+          .describe(
+            "Which stored rendition to fetch. Defaults to 'original' (full quality, and the only one a PDF receipt has). Falls back to the other rendition when the requested one is absent.",
+          )
+          .optional(),
+        inline: z
+          .boolean()
+          .describe(
+            `Return the receipt bytes in the result — an image block for images, an embedded resource for PDFs and everything else. Only for receipts under ${MAX_INLINE_BYTES} bytes.`,
+          )
+          .optional(),
+        extract_text: z
+          .boolean()
+          .describe(
+            "Also return the PDF's text layer as `text`. Ideal for looking up line items or totals without transferring the file. PDFs only; a scanned receipt has no text layer to extract.",
+          )
+          .optional(),
+        output_dir: z
+          .string()
+          .describe(
+            'Directory to write the receipt into. Defaults to $SPLITWISE_OUTPUT_DIR, else the current working directory.',
+          )
+          .optional(),
+        write: z
+          .boolean()
+          .describe(
+            "Write the receipt to disk. Defaults to true. Pass false when the caller cannot reach this server's filesystem, or when the server runs read-only.",
+          )
+          .optional(),
+      }),
+    },
+    async ({ id, size, inline, extract_text, output_dir, write }) => {
+      const wanted: ReceiptSize = size ?? 'original';
+      const fallback: ReceiptSize = wanted === 'original' ? 'large' : 'original';
 
-    const expense = await client.request<{ expense?: { receipt?: ExpenseReceipt | null } | null }>(
-'GET',
-`/get_expense/${id}`,
-    );
-    const receipt = expense?.expense?.receipt;
-    const url = receipt?.[wanted] || receipt?.[fallback];
-    if (!url) {
-throw new Error(`Splitwise expense ${id} has no receipt attached.`);
-    }
-    const served: ReceiptSize = receipt?.[wanted] ? wanted : fallback;
+      const expense = await client.request<{
+        expense?: { receipt?: ExpenseReceipt | null } | null;
+      }>('GET', `/get_expense/${id}`);
+      const receipt = expense?.expense?.receipt;
+      const url = receipt?.[wanted] || receipt?.[fallback];
+      if (!url) {
+        throw new Error(`Splitwise expense ${id} has no receipt attached.`);
+      }
+      const served: ReceiptSize = receipt?.[wanted] ? wanted : fallback;
 
-    const asset = await client.fetchAsset(url);
-    if (asset.bytes.length === 0) {
-throw new Error(`Splitwise returned an empty receipt body for expense ${id}.`);
-    }
+      const asset = await client.fetchAsset(url);
+      if (asset.bytes.length === 0) {
+        throw new Error(`Splitwise returned an empty receipt body for expense ${id}.`);
+      }
 
-    const mimeType = resolveMimeType(asset.contentType, asset.bytes);
-    const base64 = Buffer.from(asset.bytes).toString('base64');
+      const mimeType = resolveMimeType(asset.contentType, asset.bytes);
+      const base64 = Buffer.from(asset.bytes).toString('base64');
 
-    // The write is best-effort: a hosted server often runs on a read-only
-    // filesystem, and failing the whole call there would strand a caller who
-    // only wanted the content. Report it and carry on — unless nothing else
-    // was requested, in which case there is no result to return (below).
-    let path: string | undefined;
-    let writeError: string | undefined;
-    if (write !== false) {
-try {
-  path = writeBinaryOutput({
-    dir: resolveOutputDir(output_dir, 'SPLITWISE_OUTPUT_DIR'),
-    baseName: `splitwise-receipt-${id}`,
-    base64,
-    extension: extensionFor(mimeType, url),
-  });
-} catch (err) {
-  writeError = describeError(err);
-}
-    }
+      // The write is best-effort: a hosted server often runs on a read-only
+      // filesystem, and failing the whole call there would strand a caller who
+      // only wanted the content. Report it and carry on — unless nothing else
+      // was requested, in which case there is no result to return (below).
+      let path: string | undefined;
+      let writeError: string | undefined;
+      if (write !== false) {
+        try {
+          path = writeBinaryOutput({
+            dir: resolveOutputDir(output_dir, 'SPLITWISE_OUTPUT_DIR'),
+            baseName: `splitwise-receipt-${id}`,
+            base64,
+            extension: extensionFor(mimeType, url),
+          });
+        } catch (err) {
+          writeError = describeError(err);
+        }
+      }
 
-    const oversized = asset.bytes.length > MAX_INLINE_BYTES;
-    const inlined = inline === true && !oversized;
+      const oversized = asset.bytes.length > MAX_INLINE_BYTES;
+      const inlined = inline === true && !oversized;
 
-    // Diagnosis and suggestion are kept apart: the diagnosis is always true,
-    // while the suggestion is only worth making if that route is still open.
-    // Folding them into one string is how a caller ends up being told to use a
-    // flag they already passed.
-    let text: string | undefined;
-    let textDiagnosis: string | undefined;
-    let textSuggestion: string | undefined;
-    if (extract_text === true) {
-if (mimeType !== PDF_MIME) {
-  textDiagnosis = `Text extraction covers PDFs only; this receipt is ${mimeType ?? 'of an unknown type'}.`;
-  textSuggestion = 'Use inline:true to get the bytes.';
-} else {
-  try {
-    const extracted = await extractPdfText(asset.bytes);
-    if (extracted.length === 0) {
-      textDiagnosis = 'This PDF has no text layer — it is probably a scan or photo.';
-      textSuggestion = 'Use inline:true to read the receipt itself.';
-    } else if (extracted.length > MAX_TEXT_CHARS) {
-      text = extracted.slice(0, MAX_TEXT_CHARS);
-      textDiagnosis = `Text truncated to the first ${MAX_TEXT_CHARS} characters.`;
-    } else {
-      text = extracted;
-    }
-  } catch (err) {
-    textDiagnosis = `Could not extract text: ${describeError(err)}.`;
-    textSuggestion = 'Use inline:true to get the bytes.';
-  }
-}
-    }
-    // Gate the suggestion on the FLAG, not the outcome — the same test the
-    // throw path's `routes` uses below. `inlined` conflates "never asked for
-    // inline" with "asked, and it was refused for size"; suggesting it in the
-    // second case contradicts the `inline_skipped` note in the same result.
-    const textNote =
-[textDiagnosis, inline === true ? undefined : textSuggestion].filter(Boolean).join(' ') ||
-undefined;
+      // Diagnosis and suggestion are kept apart: the diagnosis is always true,
+      // while the suggestion is only worth making if that route is still open.
+      // Folding them into one string is how a caller ends up being told to use a
+      // flag they already passed.
+      let text: string | undefined;
+      let textDiagnosis: string | undefined;
+      let textSuggestion: string | undefined;
+      if (extract_text === true) {
+        if (mimeType !== PDF_MIME) {
+          textDiagnosis = `Text extraction covers PDFs only; this receipt is ${mimeType ?? 'of an unknown type'}.`;
+          textSuggestion = 'Use inline:true to get the bytes.';
+        } else {
+          try {
+            const extracted = await extractPdfText(asset.bytes);
+            if (extracted.length === 0) {
+              textDiagnosis = 'This PDF has no text layer — it is probably a scan or photo.';
+              textSuggestion = 'Use inline:true to read the receipt itself.';
+            } else if (extracted.length > MAX_TEXT_CHARS) {
+              text = extracted.slice(0, MAX_TEXT_CHARS);
+              textDiagnosis = `Text truncated to the first ${MAX_TEXT_CHARS} characters.`;
+            } else {
+              text = extracted;
+            }
+          } catch (err) {
+            textDiagnosis = `Could not extract text: ${describeError(err)}.`;
+            textSuggestion = 'Use inline:true to get the bytes.';
+          }
+        }
+      }
+      // Gate the suggestion on the FLAG, not the outcome — the same test the
+      // throw path's `routes` uses below. `inlined` conflates "never asked for
+      // inline" with "asked, and it was refused for size"; suggesting it in the
+      // second case contradicts the `inline_skipped` note in the same result.
+      const textNote =
+        [textDiagnosis, inline === true ? undefined : textSuggestion].filter(Boolean).join(' ') ||
+        undefined;
 
-    // Nothing reached the caller: no file, no bytes, no text. Fail loudly and
-    // name the way out rather than reporting a success with an empty result.
-    if (path === undefined && !inlined && text === undefined) {
-const reason = writeError
-  ? `could not be written (${writeError})`
-  : 'was not written (write:false)';
-// Name every blocker — more than one can apply at once — then offer only
-// the routes still open. A flag the caller already passed is not a
-// suggestion; when `inline` was requested it can only have been rejected
-// for size, so it never belongs in the list.
-const blockers = [
-  textDiagnosis,
-  inline === true && oversized
-    ? `The receipt is ${asset.bytes.length} bytes, over the ${MAX_INLINE_BYTES}-byte inline limit.`
-    : undefined,
-].filter((b): b is string => b !== undefined);
+      // Nothing reached the caller: no file, no bytes, no text. Fail loudly and
+      // name the way out rather than reporting a success with an empty result.
+      if (path === undefined && !inlined && text === undefined) {
+        const reason = writeError
+          ? `could not be written (${writeError})`
+          : 'was not written (write:false)';
+        // Name every blocker — more than one can apply at once — then offer only
+        // the routes still open. A flag the caller already passed is not a
+        // suggestion; when `inline` was requested it can only have been rejected
+        // for size, so it never belongs in the list.
+        const blockers = [
+          textDiagnosis,
+          inline === true && oversized
+            ? `The receipt is ${asset.bytes.length} bytes, over the ${MAX_INLINE_BYTES}-byte inline limit.`
+            : undefined,
+        ].filter((b): b is string => b !== undefined);
 
-const routes: string[] = [];
-if (inline !== true) routes.push('inline:true for the bytes');
-if (extract_text !== true && mimeType === PDF_MIME) routes.push("extract_text:true for the PDF's text");
-const advice = routes.length > 0
-  ? `Re-run with ${routes.join(' or ')}.`
-  : 'Point output_dir somewhere this server can write.';
+        const routes: string[] = [];
+        if (inline !== true) routes.push('inline:true for the bytes');
+        if (extract_text !== true && mimeType === PDF_MIME)
+          routes.push("extract_text:true for the PDF's text");
+        const advice =
+          routes.length > 0
+            ? `Re-run with ${routes.join(' or ')}.`
+            : 'Point output_dir somewhere this server can write.';
 
-throw new Error(
-  [
-    `The receipt for expense ${id} ${reason}, and nothing was returned in its place.`,
-    ...blockers,
-    advice,
-  ].join(' '),
-);
-    }
+        throw new Error(
+          [
+            `The receipt for expense ${id} ${reason}, and nothing was returned in its place.`,
+            ...blockers,
+            advice,
+          ].join(' '),
+        );
+      }
 
-    const result = minifiedResult({
-expense_id: id,
-size: served,
-...(served !== wanted
-  ? { requested_size: wanted, note: `Expense ${id} has no ${wanted} rendition; fetched ${served}.` }
-  : {}),
-...(path !== undefined ? { path } : {}),
-...(writeError !== undefined ? { write_error: writeError } : {}),
-bytes: asset.bytes.length,
-content_type: mimeType ?? 'unknown',
-// The receipt URL itself is a signed capability, so report only its host.
-source_host: new URL(url).host,
-inline: inlined,
-...(inline === true && oversized
-  ? {
-      // The write outcome is already known, so don't advise `write:true`
-      // to someone who either has the file or just watched the write fail.
-      inline_skipped:
-        `Receipt is ${asset.bytes.length} bytes, over the ${MAX_INLINE_BYTES}-byte inline limit — ` +
-        (path !== undefined
-          ? 'read it from the path above.'
-          : 'get it on disk instead, with write:true and an output_dir this server can write to.'),
-    }
-  : {}),
-...(text !== undefined ? { text } : {}),
-...(textNote !== undefined ? { text_note: textNote } : {}),
-    });
+      const result = minifiedResult({
+        expense_id: id,
+        size: served,
+        ...(served !== wanted
+          ? {
+              requested_size: wanted,
+              note: `Expense ${id} has no ${wanted} rendition; fetched ${served}.`,
+            }
+          : {}),
+        ...(path !== undefined ? { path } : {}),
+        ...(writeError !== undefined ? { write_error: writeError } : {}),
+        bytes: asset.bytes.length,
+        content_type: mimeType ?? 'unknown',
+        // The receipt URL itself is a signed capability, so report only its host.
+        source_host: new URL(url).host,
+        inline: inlined,
+        ...(inline === true && oversized
+          ? {
+              // The write outcome is already known, so don't advise `write:true`
+              // to someone who either has the file or just watched the write fail.
+              inline_skipped:
+                `Receipt is ${asset.bytes.length} bytes, over the ${MAX_INLINE_BYTES}-byte inline limit — ` +
+                (path !== undefined
+                  ? 'read it from the path above.'
+                  : 'get it on disk instead, with write:true and an output_dir this server can write to.'),
+            }
+          : {}),
+        ...(text !== undefined ? { text } : {}),
+        ...(textNote !== undefined ? { text_note: textNote } : {}),
+      });
 
-    if (inlined) {
-const type = mimeType ?? 'application/octet-stream';
-result.content.push(
-  type.startsWith('image/')
-    ? imageResult(base64, type).content[0]!
-    : resourceBlock(`splitwise://expenses/${id}/receipt`, type, base64),
-);
-    }
-    return result;
-  });
+      if (inlined) {
+        const type = mimeType ?? 'application/octet-stream';
+        result.content.push(
+          type.startsWith('image/')
+            ? imageResult(base64, type).content[0]!
+            : resourceBlock(`splitwise://expenses/${id}/receipt`, type, base64),
+        );
+      }
+      return result;
+    },
+  );
 }
