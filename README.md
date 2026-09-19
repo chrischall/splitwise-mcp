@@ -25,7 +25,7 @@ Ask Claude things like:
 ## Requirements
 
 - [Claude Desktop](https://claude.ai/download) or [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-- [Node.js](https://nodejs.org) 20.6 or later
+- [Node.js](https://nodejs.org) 22 or later
 - A [Splitwise](https://www.splitwise.com) account and API key
 
 ## Acknowledgement of Terms
