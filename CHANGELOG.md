@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.1.0](https://github.com/chrischall/splitwise-mcp/compare/v3.0.0...v3.1.0) (2026-09-19)
+
+
+### Features
+
+* **deps:** take mcp-utils 1.0.0 so server/discover answers ([#196](https://github.com/chrischall/splitwise-mcp/issues/196)) ([c51e4f9](https://github.com/chrischall/splitwise-mcp/commit/c51e4f918bf04d26f1c96f3a1d8cf7cafda3d0e6))
+
+
+### Bug Fixes
+
+* **deps:** raise the manifest node floor to match mcp-utils 1.0.0 ([#198](https://github.com/chrischall/splitwise-mcp/issues/198)) ([3b4b5df](https://github.com/chrischall/splitwise-mcp/commit/3b4b5df813bdd08419f433fa0daf27dfc4a8b8f0))
+
 ## [3.0.0](https://github.com/chrischall/splitwise-mcp/compare/v2.4.2...v3.0.0) (2026-09-17)
 
 
