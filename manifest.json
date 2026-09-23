@@ -64,7 +64,7 @@
     },
     {
       "name": "sw_update_user",
-      "description": "Update user details"
+      "description": "Update the current user's name, locale or default currency (not email or password)"
     },
     {
       "name": "sw_list_groups",
