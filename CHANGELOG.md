@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.2](https://github.com/chrischall/splitwise-mcp/compare/v3.1.1...v3.1.2) (2026-09-23)
+
+
+### Bug Fixes
+
+* surface Splitwise write rejections as errors and stop sw_update_user changing credentials ([#204](https://github.com/chrischall/splitwise-mcp/issues/204)) ([1a9f5ad](https://github.com/chrischall/splitwise-mcp/commit/1a9f5ad693050fef292276effb4822e4b31e517f))
+
 ## [3.1.1](https://github.com/chrischall/splitwise-mcp/compare/v3.1.0...v3.1.1) (2026-09-23)
 
 
