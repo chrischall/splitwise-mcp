@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.1](https://github.com/chrischall/splitwise-mcp/compare/v3.1.0...v3.1.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* **deps:** require zod ^4.6.5 to match @chrischall/mcp-utils 2.4.0 ([#203](https://github.com/chrischall/splitwise-mcp/issues/203)) ([2af640a](https://github.com/chrischall/splitwise-mcp/commit/2af640a089881b8af7af3d2102e54bf17417ac94))
+* **deps:** upgrade @chrischall/mcp-utils to 2.4.0 and @fetchproxy/* to 3.2.0 ([#201](https://github.com/chrischall/splitwise-mcp/issues/201)) ([88673f6](https://github.com/chrischall/splitwise-mcp/commit/88673f6875c6636928dfeb3e90e16ece865f76b4))
+
 ## [3.1.0](https://github.com/chrischall/splitwise-mcp/compare/v3.0.0...v3.1.0) (2026-09-19)
 
 
