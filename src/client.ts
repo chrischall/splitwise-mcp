@@ -68,6 +68,36 @@ function redactAssetQuery(err: unknown, search: string): unknown {
   return err instanceof ApiError ? new ApiError(err.status, message) : new Error(message);
 }
 
+/** Flatten Splitwise's `errors` value (`{field: [msg]}`, `[msg]` or a string) into messages. */
+function flattenErrors(errors: unknown): string[] {
+  if (errors == null) return [];
+  if (typeof errors === 'string') return errors ? [errors] : [];
+  if (Array.isArray(errors)) return errors.flatMap((e) => flattenErrors(e));
+  if (typeof errors === 'object') {
+    return Object.entries(errors as Record<string, unknown>).flatMap(([field, value]) =>
+      flattenErrors(value).map((msg) => (field === 'base' ? msg : `${field}: ${msg}`)),
+    );
+  }
+  return [String(errors)];
+}
+
+/**
+ * Splitwise answers a failed write with HTTP 200, not an error status:
+ * create/update return `{expenses: [], errors: {...}}` and delete/undelete
+ * return `{success: false, errors: {...}}`. `fetchJson` only throws on
+ * non-2xx, so without this check a rejected write reaches the tool as an
+ * ordinary result and reads as "created"/"deleted". Throwing here makes every
+ * write tool report it with `isError`.
+ */
+function assertWriteSucceeded(data: unknown): void {
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) return;
+  const record = data as Record<string, unknown>;
+  const messages = flattenErrors(record.errors);
+  if (messages.length === 0 && record.success !== false) return;
+  const detail = messages.length > 0 ? messages.join('; ') : 'success: false with no error detail';
+  throw new Error(`Splitwise rejected the request: ${detail}`);
+}
+
 export class SplitwiseClient {
   private readonly apiKey: string | null;
   /** Which source supplied the API key — a LABEL, never the value. */
@@ -154,7 +184,9 @@ export class SplitwiseClient {
   }
 
   async request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    return this.api.fetchJson<T>(method, path, body !== undefined ? { body } : {});
+    const data = await this.api.fetchJson<T>(method, path, body !== undefined ? { body } : {});
+    if (method.toUpperCase() !== 'GET') assertWriteSucceeded(data);
+    return data;
   }
 
   /**

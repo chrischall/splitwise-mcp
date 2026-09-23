@@ -126,7 +126,7 @@ Add to Claude Desktop config:
 | `sw_get_current_user` | Get the authenticated user's profile |
 | `sw_healthcheck` | Verify the API key and Splitwise reachability; says which of the two failed |
 | `sw_get_user` | Get another user's profile by ID |
-| `sw_update_user` | Update the current user's profile fields |
+| `sw_update_user` | Update the current user's name, locale or default currency (login email and password are not changeable here) |
 
 ### Groups
 

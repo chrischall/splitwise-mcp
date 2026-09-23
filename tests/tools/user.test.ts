@@ -53,17 +53,43 @@ describe('user tools', () => {
         id: 99,
         first_name: 'Chris',
         last_name: 'Smith',
-        email: 'chris@example.com',
         locale: 'en',
         default_currency: 'USD',
       });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/update_user/99', {
         first_name: 'Chris',
         last_name: 'Smith',
-        email: 'chris@example.com',
         locale: 'en',
         default_currency: 'USD',
       });
+    });
+
+    // Account credentials are out of scope: an injected instruction plus a
+    // model-set confirm:true must not be able to change the login email or
+    // password (fleet-audit #250). Credential changes stay in the Splitwise UI.
+    it('does not expose email or password in its input schema', async () => {
+      const tool = (await harness.client.listTools()).tools.find((t) => t.name === 'sw_update_user');
+      const props = Object.keys((tool!.inputSchema as { properties?: object }).properties ?? {});
+      expect(props).not.toContain('email');
+      expect(props).not.toContain('password');
+    });
+
+    it('never forwards email or password even if a caller passes them', async () => {
+      mockRequest.mockResolvedValue({ user: {} });
+      await harness.callTool('sw_update_user', {
+        confirm: true,
+        id: 99,
+        first_name: 'Chris',
+        email: 'x@attacker.example',
+        password: 'hunter2',
+      });
+      const [, , body] = mockRequest.mock.calls[0];
+      expect(body).toEqual({ first_name: 'Chris' });
+    });
+
+    it('is annotated as a non-read-only write so hosts can prompt', async () => {
+      const tool = (await harness.client.listTools()).tools.find((t) => t.name === 'sw_update_user');
+      expect(tool!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
     });
 
     it('does not send undefined optional fields', async () => {

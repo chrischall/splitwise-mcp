@@ -42,35 +42,37 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
   server.registerTool(
     'sw_update_user',
     {
-      description: "Update the current user's profile fields. id must be the current user's id.",
+      description:
+        "Update the current user's profile fields: name, locale and default currency. id must be the current user's id. The login email and password are deliberately not settable here — account credentials are changed in the Splitwise app, not by an assistant.",
+      annotations: { readOnlyHint: false, destructiveHint: true },
+      // No `email` / `password`: changing the login email is an account
+      // takeover primitive (a password reset to the new address follows), and
+      // the only gate would be a model-set `confirm` that injected text from
+      // comments, notifications or receipts could talk it into (fleet-audit
+      // #250). z.object strips unknown keys, so a caller passing them anyway
+      // has them dropped before the request is built.
       inputSchema: z.object({
         id: z.number().describe("User ID (must be the current user's id)"),
         first_name: z.string().optional(),
         last_name: z.string().optional(),
-        email: z.string().optional(),
-        password: z.string().optional(),
         locale: z.string().optional(),
         default_currency: z.string().optional(),
         confirm: schemaConfirm,
       }),
     },
-    async ({ id, first_name, last_name, email, password, locale, default_currency, confirm }) => {
+    async ({ id, first_name, last_name, locale, default_currency, confirm }) => {
       const body = pruneUndefined({
         first_name,
         last_name,
-        email,
-        password,
         locale,
         default_currency,
       });
-      // Never echo the password in the dry-run preview.
-      const previewBody = { ...body, ...(password !== undefined ? { password: '[hidden]' } : {}) };
       const gate = previewUnlessConfirmed(
         confirm,
         `Update current Splitwise user ${id} profile`,
         'POST',
         `/update_user/${id}`,
-        previewBody,
+        body,
       );
       if (gate) return gate;
       const data = await client.request('POST', `/update_user/${id}`, body);
