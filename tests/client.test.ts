@@ -260,3 +260,61 @@ describe('SplitwiseClient.describeCredential', () => {
     expect(JSON.stringify(new SplitwiseClient().describeCredential())).not.toContain('SUPER_SECRET_KEY_VALUE');
   });
 });
+
+describe('SplitwiseClient write-error bodies (HTTP 200 with errors)', () => {
+  beforeEach(() => {
+    process.env.SPLITWISE_API_KEY = 'test-key';
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubBody(body: unknown) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify(body) }),
+    );
+  }
+
+  it('throws on create_expense validation errors ({expenses: [], errors: {...}})', async () => {
+    stubBody({ expenses: [], errors: { base: ['An expense must have a cost'], cost: ['is invalid'] } });
+    await expect(new SplitwiseClient().request('POST', '/create_expense', {})).rejects.toThrow(
+      /Splitwise rejected the request: .*An expense must have a cost.*cost: is invalid/,
+    );
+  });
+
+  it('throws on {success: false, errors: {...}} from delete/undelete', async () => {
+    stubBody({ success: false, errors: { base: ['Expense not found'] } });
+    await expect(new SplitwiseClient().request('POST', '/delete_expense/1')).rejects.toThrow(
+      'Expense not found',
+    );
+  });
+
+  it('throws on {success: false} with no error detail', async () => {
+    stubBody({ success: false });
+    await expect(new SplitwiseClient().request('POST', '/delete_friend/1')).rejects.toThrow(
+      /Splitwise rejected the request/,
+    );
+  });
+
+  it('flattens an array-shaped errors value', async () => {
+    stubBody({ errors: ['one', 'two'] });
+    await expect(new SplitwiseClient().request('POST', '/create_group', {})).rejects.toThrow('one; two');
+  });
+
+  it('passes a write through when errors is empty', async () => {
+    stubBody({ expenses: [{ id: 5 }], errors: {} });
+    await expect(new SplitwiseClient().request('POST', '/create_expense', {})).resolves.toEqual({
+      expenses: [{ id: 5 }],
+      errors: {},
+    });
+  });
+
+  it('passes {success: true, errors: []} through', async () => {
+    stubBody({ success: true, errors: [] });
+    await expect(new SplitwiseClient().request('POST', '/delete_expense/1')).resolves.toEqual({
+      success: true,
+      errors: [],
+    });
+  });
+});
