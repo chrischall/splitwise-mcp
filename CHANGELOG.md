@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.0](https://github.com/chrischall/splitwise-mcp/compare/v3.1.2...v3.2.0) (2026-09-24)
+
+
+### Features
+
+* confirm writes with a preview token instead of confirm: true ([f874bc1](https://github.com/chrischall/splitwise-mcp/commit/f874bc179049d3a32c113858983b17ca832e6ee4))
+
 ## [3.1.2](https://github.com/chrischall/splitwise-mcp/compare/v3.1.1...v3.1.2) (2026-09-23)
 
 
