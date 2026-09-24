@@ -40,7 +40,10 @@ src/
                   #   inline bytes, and PDF text extraction
     utilities.ts  # sw_get_notifications, sw_get_categories, sw_get_currencies,
                   #   sw_get_comments, sw_create_comment, sw_delete_comment
+    _confirm.ts   # confirmWrite(): the confirmation gate every write goes through
 ```
+
+Every write except the two undeletes is gated by `confirmWrite(ctx, …)` from `src/tools/_confirm.ts` (Splitwise writes notify other people). A client that can show a prompt is asked; one that cannot gets the two-step token flow (`MCP_CONFIRM_MODE`): the first call does nothing and returns a preview (`action`, `method`, `path`, `willSend`) plus a `confirmToken` bound to exactly that request, and only a repeat call with the token writes. Validation (e.g. `split_equally` vs `users`) runs BEFORE the gate, so a bad request is refused on the first call. A new write tool takes `confirmToken: confirmTokenParam`, ends its description with `CONFIRM_NOTE`, and calls `confirmWrite` before the request.
 
 Each tool file exports a `register<Domain>Tools(server, client)` function that calls `server.registerTool(name, { description, annotations, inputSchema }, handler)` (high-level `McpServer` API with zod schemas). The `SplitwiseClient` is INJECTED as the second argument rather than imported as a module singleton — a hosted per-user deployment builds one client per authenticated user, which a singleton cannot express. `index.ts` passes the register functions to `runMcp`, which builds the `McpServer`, calls each, and connects the stdio transport.
 

@@ -3,7 +3,7 @@ import { SW_VIEWS, viewGroup, viewGroups } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { minifiedResult, pruneUndefined, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
-import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
+import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
 
 export function registerGroupTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool(
@@ -45,7 +45,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
   server.registerTool(
     'sw_create_group',
     {
-      description: 'Create a new Splitwise group.',
+      description: `Create a new Splitwise group. ${CONFIRM_NOTE}`,
       annotations: { destructiveHint: true },
       inputSchema: z.object({
         name: z.string().describe('Group name'),
@@ -57,18 +57,21 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
           .boolean()
           .describe('Whether to simplify debts by default')
           .optional(),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ name, group_type, simplify_by_default, confirm }) => {
+    async ({ name, group_type, simplify_by_default, confirmToken }, ctx) => {
       const body = pruneUndefined({ name, group_type, simplify_by_default });
-      const gate = previewUnlessConfirmed(
-        confirm,
-        `Create Splitwise group "${name}"`,
-        'POST',
-        '/create_group',
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_create_group',
+        action: 'group.create',
+        summary: `Create Splitwise group "${name}"`,
+        method: 'POST',
+        path: '/create_group',
         body,
-      );
+        target: '',
+        confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', '/create_group', body);
       return minifiedResult(data);
@@ -79,17 +82,17 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     'sw_add_user_to_group',
     {
       description:
-        'Add a user to a Splitwise group. Provide user_id (preferred, use sw_list_friends to resolve a name) or first_name + last_name + email to invite by email.',
+        `Add a user to a Splitwise group. Provide user_id (preferred, use sw_list_friends to resolve a name) or first_name + last_name + email to invite by email. ${CONFIRM_NOTE}`,
       inputSchema: z.object({
         group_id: z.number().describe('Group ID'),
         user_id: z.number().describe('User ID (preferred)').optional(),
         first_name: z.string().optional(),
         last_name: z.string().optional(),
         email: z.string().optional(),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ group_id, user_id, first_name, last_name, email, confirm }) => {
+    async ({ group_id, user_id, first_name, last_name, email, confirmToken }, ctx) => {
       let body: Record<string, unknown>;
       if (user_id !== undefined) {
         body = { group_id, user_id };
@@ -101,13 +104,16 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
         }
         body = { group_id, first_name, last_name, email };
       }
-      const gate = previewUnlessConfirmed(
-        confirm,
-        `Add a user to Splitwise group ${group_id} (may send an invite email)`,
-        'POST',
-        '/add_user_to_group',
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_add_user_to_group',
+        action: 'group.add_user',
+        summary: `Add a user to Splitwise group ${group_id} (may send an invite email)`,
+        method: 'POST',
+        path: '/add_user_to_group',
         body,
-      );
+        target: group_id,
+        confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', '/add_user_to_group', body);
       return minifiedResult(data);
@@ -118,22 +124,25 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     'sw_remove_user_from_group',
     {
       description:
-        'Remove a user from a Splitwise group. Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it removes the user.',
+        `Remove a user from a Splitwise group. ${CONFIRM_NOTE}`,
       annotations: { destructiveHint: true },
       inputSchema: z.object({
         group_id: z.number().describe('Group ID'),
         user_id: z.number().describe('User ID to remove'),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ group_id, user_id, confirm }) => {
-      const gate = previewUnlessConfirmed(
-        confirm,
-        `Remove user ${user_id} from Splitwise group ${group_id}`,
-        'POST',
-        '/remove_user_from_group',
-        { group_id, user_id },
-      );
+    async ({ group_id, user_id, confirmToken }, ctx) => {
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_remove_user_from_group',
+        action: 'group.remove_user',
+        summary: `Remove user ${user_id} from Splitwise group ${group_id}`,
+        method: 'POST',
+        path: '/remove_user_from_group',
+        body: { group_id, user_id },
+        target: group_id,
+        confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', '/remove_user_from_group', { group_id, user_id });
       return minifiedResult(data);
@@ -144,20 +153,23 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     'sw_delete_group',
     {
       description:
-        'Soft-delete a Splitwise group. Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it deletes.',
+        `Soft-delete a Splitwise group. ${CONFIRM_NOTE}`,
       annotations: { destructiveHint: true },
       inputSchema: z.object({
         id: z.number().describe('Group ID to delete'),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, confirm }) => {
-      const gate = previewUnlessConfirmed(
-        confirm,
-        `Soft-delete Splitwise group ${id}`,
-        'POST',
-        `/delete_group/${id}`,
-      );
+    async ({ id, confirmToken }, ctx) => {
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_delete_group',
+        action: 'group.delete',
+        summary: `Soft-delete Splitwise group ${id}`,
+        method: 'POST',
+        path: `/delete_group/${id}`,
+        target: id,
+        confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', `/delete_group/${id}`);
       return minifiedResult(data);

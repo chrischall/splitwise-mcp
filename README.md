@@ -115,6 +115,16 @@ Add to Claude Desktop config:
 | `SPLITWISE_API_KEY` | Yes | API key from [splitwise.com/apps/register](https://secure.splitwise.com/apps/register) |
 | `SPLITWISE_OUTPUT_DIR` | No | Where `sw_get_receipt` writes downloaded receipts. Defaults to the current working directory. |
 
+## Confirmations
+
+Every Splitwise write (creating, editing or deleting expenses, groups, friends, comments, or your profile) notifies other people, so it asks you to confirm first. A client that can show a confirmation prompt (Claude Code) shows one. On a client that cannot (claude.ai, Claude Desktop), the first call changes nothing and returns a preview of exactly what will be sent plus a `confirmToken`; only a repeat call with that token goes through, and the token is refused if anything in the request changed in between.
+
+| variable | default | |
+|---|---|---|
+| `MCP_CONFIRM_MODE` | `ask-user` | What a write does on a client that cannot show a confirmation prompt (claude.ai, Claude Desktop). `ask-user`: two steps — the first call does nothing and returns a preview plus a token, and the model must get your approval in chat before calling again with it. `auto`: the same two steps, but the model may use the token after reviewing the preview itself. `refuse`: writes are refused on such clients. A client that can show prompts (Claude Code) always gets the real prompt. An unrecognised value is treated as `refuse`. |
+| `MCP_CONFIRM_TTL_SECONDS` | `600` | How long a token stays valid. |
+| `MCP_CONFIRM_SECRET` | random per process | Signing key; set it only if tokens must survive a server restart. |
+
 ## Available tools
 
 26 tools across 6 domains. All tools are prefixed `sw_`.
@@ -209,6 +219,7 @@ src/
     expenses.ts     expense CRUD
     receipts.ts     authenticated receipt download + PDF text extraction
     utilities.ts    notifications, categories, currencies, comments
+    _confirm.ts     confirmation gate shared by every write
 ```
 
 ## License

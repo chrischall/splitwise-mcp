@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { client } from '../../src/client.js';
 import { registerUserTools } from '../../src/tools/user.js';
-import { createTestHarness } from '../helpers.js';
+import { confirmedCall, createTestHarness } from '../helpers.js';
 
 // Tool registrars use the module-level `client` singleton; spy on its `request`.
 const mockRequest = vi.spyOn(client, 'request').mockResolvedValue(undefined as never);
@@ -43,14 +43,13 @@ describe('user tools', () => {
   describe('sw_update_user', () => {
     it('calls POST /update_user/99 with only provided fields', async () => {
       mockRequest.mockResolvedValue({ user: { id: 99 } });
-      await harness.callTool('sw_update_user', { confirm: true, id: 99, first_name: 'Chris' });
+      await confirmedCall(harness, mockRequest, 'sw_update_user', { id: 99, first_name: 'Chris' });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/update_user/99', { first_name: 'Chris' });
     });
 
     it('sends all provided optional fields', async () => {
       mockRequest.mockResolvedValue({ user: {} });
-      await harness.callTool('sw_update_user', { confirm: true,
-        id: 99,
+      await confirmedCall(harness, mockRequest, 'sw_update_user', { id: 99,
         first_name: 'Chris',
         last_name: 'Smith',
         locale: 'en',
@@ -65,7 +64,7 @@ describe('user tools', () => {
     });
 
     // Account credentials are out of scope: an injected instruction plus a
-    // model-set confirm:true must not be able to change the login email or
+    // model-approved confirmation must not be able to change the login email or
     // password (fleet-audit #250). Credential changes stay in the Splitwise UI.
     it('does not expose email or password in its input schema', async () => {
       const tool = (await harness.client.listTools()).tools.find((t) => t.name === 'sw_update_user');
@@ -76,8 +75,7 @@ describe('user tools', () => {
 
     it('never forwards email or password even if a caller passes them', async () => {
       mockRequest.mockResolvedValue({ user: {} });
-      await harness.callTool('sw_update_user', {
-        confirm: true,
+      await confirmedCall(harness, mockRequest, 'sw_update_user', {
         id: 99,
         first_name: 'Chris',
         email: 'x@attacker.example',
@@ -94,7 +92,7 @@ describe('user tools', () => {
 
     it('does not send undefined optional fields', async () => {
       mockRequest.mockResolvedValue({ user: {} });
-      await harness.callTool('sw_update_user', { confirm: true, id: 99 });
+      await confirmedCall(harness, mockRequest, 'sw_update_user', { id: 99 });
       const [, , body] = mockRequest.mock.calls[0];
       expect(body).toEqual({});
     });

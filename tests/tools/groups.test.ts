@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { client } from '../../src/client.js';
 import { registerGroupTools } from '../../src/tools/groups.js';
-import { createTestHarness } from '../helpers.js';
+import { confirmedCall, createTestHarness } from '../helpers.js';
 
 // Tool registrars use the module-level `client` singleton; spy on its `request`.
 const mockRequest = vi.spyOn(client, 'request').mockResolvedValue(undefined as never);
@@ -49,13 +49,13 @@ describe('group tools', () => {
   describe('sw_create_group', () => {
     it('calls POST /create_group with name', async () => {
       mockRequest.mockResolvedValue({ group: { id: 1, name: 'Vacation' } });
-      await harness.callTool('sw_create_group', { confirm: true, name: 'Vacation' });
+      await confirmedCall(harness, mockRequest, 'sw_create_group', { name: 'Vacation' });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/create_group', { name: 'Vacation' });
     });
 
     it('includes optional group_type when provided', async () => {
       mockRequest.mockResolvedValue({ group: {} });
-      await harness.callTool('sw_create_group', { confirm: true, name: 'Trip', group_type: 'trip' });
+      await confirmedCall(harness, mockRequest, 'sw_create_group', { name: 'Trip', group_type: 'trip' });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/create_group', {
         name: 'Trip',
         group_type: 'trip',
@@ -66,7 +66,7 @@ describe('group tools', () => {
   describe('sw_add_user_to_group', () => {
     it('sends {group_id, user_id} when user_id is provided', async () => {
       mockRequest.mockResolvedValue({ success: true });
-      await harness.callTool('sw_add_user_to_group', { confirm: true, group_id: 10, user_id: 99 });
+      await confirmedCall(harness, mockRequest, 'sw_add_user_to_group', { group_id: 10, user_id: 99 });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/add_user_to_group', {
         group_id: 10,
         user_id: 99,
@@ -75,8 +75,7 @@ describe('group tools', () => {
 
     it('sends {group_id, first_name, last_name, email} when user_id is absent', async () => {
       mockRequest.mockResolvedValue({ success: true });
-      await harness.callTool('sw_add_user_to_group', { confirm: true,
-        group_id: 10,
+      await confirmedCall(harness, mockRequest, 'sw_add_user_to_group', { group_id: 10,
         first_name: 'Meredith',
         last_name: 'Grey',
         email: 'meredith@example.com',
@@ -90,16 +89,22 @@ describe('group tools', () => {
     });
 
     it('throws if user_id absent and name/email fields missing', async () => {
-      const result = await harness.callTool('sw_add_user_to_group', { confirm: true, group_id: 10, first_name: 'Meredith' });
-      expect(result.isError).toBe(true);
-      expect((result.content[0] as { text: string }).text).toContain('first_name, last_name, and email are required');
+      // The guard runs before the confirmation gate, so it refuses on the first
+      // call and still refuses when a confirmToken is supplied.
+      const args = { group_id: 10, first_name: 'Meredith' };
+      for (const call of [args, { ...args, confirmToken: 'any-token' }]) {
+        const result = await harness.callTool('sw_add_user_to_group', call);
+        expect(result.isError).toBe(true);
+        expect((result.content[0] as { text: string }).text).toContain('first_name, last_name, and email are required');
+      }
+      expect(mockRequest).not.toHaveBeenCalled();
     });
   });
 
   describe('sw_remove_user_from_group', () => {
     it('calls POST /remove_user_from_group with group_id and user_id', async () => {
       mockRequest.mockResolvedValue({ success: true });
-      await harness.callTool('sw_remove_user_from_group', { confirm: true, group_id: 10, user_id: 99 });
+      await confirmedCall(harness, mockRequest, 'sw_remove_user_from_group', { group_id: 10, user_id: 99 });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/remove_user_from_group', {
         group_id: 10,
         user_id: 99,
@@ -110,7 +115,7 @@ describe('group tools', () => {
   describe('sw_delete_group', () => {
     it('calls POST /delete_group/42', async () => {
       mockRequest.mockResolvedValue({ success: true });
-      const result = await harness.callTool('sw_delete_group', { confirm: true, id: 42 });
+      const { result } = await confirmedCall(harness, mockRequest, 'sw_delete_group', { id: 42 });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/delete_group/42');
       expect(result.isError).toBeFalsy();
     });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { client } from '../../src/client.js';
 import { registerFriendTools } from '../../src/tools/friends.js';
-import { createTestHarness } from '../helpers.js';
+import { confirmedCall, createTestHarness } from '../helpers.js';
 
 // Tool registrars use the module-level `client` singleton; spy on its `request`.
 const mockRequest = vi.spyOn(client, 'request').mockResolvedValue(undefined as never);
@@ -34,15 +34,14 @@ describe('friend tools', () => {
   describe('sw_create_friend', () => {
     it('calls POST /create_friend with required user_email', async () => {
       mockRequest.mockResolvedValue({ friends: [] });
-      const result = await harness.callTool('sw_create_friend', { confirm: true, user_email: 'new@example.com' });
+      const { result } = await confirmedCall(harness, mockRequest, 'sw_create_friend', { user_email: 'new@example.com' });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/create_friend', { user_email: 'new@example.com' });
       expect(result.isError).toBeFalsy();
     });
 
     it('includes optional name fields when provided', async () => {
       mockRequest.mockResolvedValue({ friends: [] });
-      await harness.callTool('sw_create_friend', { confirm: true,
-        user_email: 'new@example.com',
+      await confirmedCall(harness, mockRequest, 'sw_create_friend', { user_email: 'new@example.com',
         user_first_name: 'Jane',
         user_last_name: 'Doe',
       });
@@ -55,7 +54,7 @@ describe('friend tools', () => {
 
     it('does not send undefined optional fields', async () => {
       mockRequest.mockResolvedValue({ friends: [] });
-      await harness.callTool('sw_create_friend', { confirm: true, user_email: 'new@example.com' });
+      await confirmedCall(harness, mockRequest, 'sw_create_friend', { user_email: 'new@example.com' });
       const [, , body] = mockRequest.mock.calls[0];
       expect(body).not.toHaveProperty('user_first_name');
       expect(body).not.toHaveProperty('user_last_name');
@@ -65,7 +64,7 @@ describe('friend tools', () => {
   describe('sw_delete_friend', () => {
     it('calls POST /delete_friend/7', async () => {
       mockRequest.mockResolvedValue({ success: true });
-      const result = await harness.callTool('sw_delete_friend', { confirm: true, id: 7 });
+      const { result } = await confirmedCall(harness, mockRequest, 'sw_delete_friend', { id: 7 });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/delete_friend/7');
       expect(result.isError).toBeFalsy();
     });

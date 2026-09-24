@@ -221,6 +221,7 @@ sw_update_expense(expense_id, description: "Corrected description", cost: "95.00
 
 ## Notes
 
+- Every write except `sw_undelete_expense` / `sw_undelete_group` asks the user to confirm first. Where the client can show a prompt, it does. Otherwise the first call changes nothing and returns `status: "confirmation-required"` with a `preview` (method, path, `willSend`) and a `confirmToken`: show the preview to the user, get their approval in chat, then repeat the same call with the same arguments plus `confirmToken` (see `MCP_CONFIRM_MODE`). A token acts once, expires, and is refused (`DRAFT_CHANGED`) if any argument changed
 - `cost` is always a decimal string (e.g. `"25.00"`)
 - `split_equally: true` and `users` array are mutually exclusive
 - For custom split updates, the **full `users` array is required** — the API replaces the entire split
