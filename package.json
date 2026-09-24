@@ -47,7 +47,7 @@
   "dependencies": {
     "@chrischall/mcp-utils": "^2.6.0",
     "@modelcontextprotocol/server": "^2.0.0",
-    "dotenv": "^17.4.0",
+    "dotenv": "^18.0.2",
     "unpdf": "^1.8.1",
     "zod": "^4.6.5"
   },
