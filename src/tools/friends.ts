@@ -3,7 +3,7 @@ import { PERSON_VIEW_NOTE, SW_VIEWS, viewFriends } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { minifiedResult, pruneUndefined, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
-import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
+import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
 
 export function registerFriendTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool(
@@ -26,24 +26,27 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
     'sw_create_friend',
     {
       description:
-        'Add a Splitwise friend by email (sends them an invite). Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it adds the friend.',
+        `Add a Splitwise friend by email (sends them an invite). ${CONFIRM_NOTE}`,
       annotations: { destructiveHint: true },
       inputSchema: z.object({
         user_email: z.string().describe('Email of the user to add as a friend'),
         user_first_name: z.string().describe('First name of the user').optional(),
         user_last_name: z.string().describe('Last name of the user').optional(),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ user_email, user_first_name, user_last_name, confirm }) => {
+    async ({ user_email, user_first_name, user_last_name, confirmToken }, ctx) => {
       const body = pruneUndefined({ user_email, user_first_name, user_last_name });
-      const gate = previewUnlessConfirmed(
-        confirm,
-        `Add ${user_email} as a Splitwise friend`,
-        'POST',
-        '/create_friend',
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_create_friend',
+        action: 'friend.create',
+        summary: `Add ${user_email} as a Splitwise friend`,
+        method: 'POST',
+        path: '/create_friend',
         body,
-      );
+        target: user_email,
+        confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', '/create_friend', body);
       return minifiedResult(data);
@@ -54,20 +57,23 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
     'sw_delete_friend',
     {
       description:
-        'Remove a Splitwise friendship by user id. Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it removes the friendship.',
+        `Remove a Splitwise friendship by user id. ${CONFIRM_NOTE}`,
       annotations: { destructiveHint: true },
       inputSchema: z.object({
         id: z.number().describe('User ID of the friend to remove'),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, confirm }) => {
-      const gate = previewUnlessConfirmed(
-        confirm,
-        `Remove Splitwise friendship with user ${id}`,
-        'POST',
-        `/delete_friend/${id}`,
-      );
+    async ({ id, confirmToken }, ctx) => {
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_delete_friend',
+        action: 'friend.delete',
+        summary: `Remove Splitwise friendship with user ${id}`,
+        method: 'POST',
+        path: `/delete_friend/${id}`,
+        target: id,
+        confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', `/delete_friend/${id}`);
       return minifiedResult(data);

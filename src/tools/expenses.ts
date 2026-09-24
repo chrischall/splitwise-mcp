@@ -3,7 +3,7 @@ import { SW_VIEWS, viewExpense, viewExpenses } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { buildQueryString, minifiedResult, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
-import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
+import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
 
 interface UserShare {
   user_id: number;
@@ -23,18 +23,18 @@ export function flattenUsers(users: UserShare[]): Record<string, unknown> {
 }
 
 function buildExpenseBody(args: Record<string, unknown>): Record<string, unknown> {
-  // `confirm` is a tool-gate flag, not part of the Splitwise expense payload.
+  // `confirmToken` is a tool-gate input, not part of the Splitwise expense payload.
   const {
     split_equally,
     users,
     expense_id: _id,
-    confirm: _confirm,
+    confirmToken: _confirmToken,
     ...rest
   } = args as {
     split_equally?: boolean;
     users?: UserShare[];
     expense_id?: number;
-    confirm?: boolean;
+    confirmToken?: string;
     [key: string]: unknown;
   };
 
@@ -124,7 +124,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_create_expense',
     {
       description:
-        'Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it creates the expense.',
+        `Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. ${CONFIRM_NOTE}`,
       inputSchema: z.object({
         group_id: z.number().describe('Group to add expense to (use 0 for no group)'),
         description: z.string().describe('Short description of the expense'),
@@ -146,18 +146,21 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         date: z.string().describe('ISO 8601 datetime').optional(),
         category_id: z.number().describe('Category id from sw_get_categories').optional(),
         details: z.string().describe('Notes').optional(),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async (args) => {
+    async (args, ctx) => {
       const body = buildExpenseBody(args as Record<string, unknown>);
-      const gate = previewUnlessConfirmed(
-        args.confirm,
-        `Create a Splitwise expense "${args.description}" (${args.cost}) — notifies group members`,
-        'POST',
-        '/create_expense',
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_create_expense',
+        action: 'expense.create',
+        summary: `Create a Splitwise expense "${args.description}" (${args.cost}) — notifies group members`,
+        method: 'POST',
+        path: '/create_expense',
         body,
-      );
+        target: args.group_id,
+        confirmToken: args.confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', '/create_expense', body);
       return minifiedResult(data);
@@ -168,7 +171,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_update_expense',
     {
       description:
-        'Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split). Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it updates the expense.',
+        `Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split). ${CONFIRM_NOTE}`,
       inputSchema: z.object({
         expense_id: z.number().describe('ID of the expense to update'),
         description: z.string().optional(),
@@ -184,19 +187,22 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         date: z.string().optional(),
         category_id: z.number().optional(),
         details: z.string().optional(),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async (args) => {
+    async (args, ctx) => {
       const { expense_id } = args;
       const body = buildExpenseBody(args as Record<string, unknown>);
-      const gate = previewUnlessConfirmed(
-        args.confirm,
-        `Update Splitwise expense ${expense_id} — notifies group members`,
-        'POST',
-        `/update_expense/${expense_id}`,
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_update_expense',
+        action: 'expense.update',
+        summary: `Update Splitwise expense ${expense_id} — notifies group members`,
+        method: 'POST',
+        path: `/update_expense/${expense_id}`,
         body,
-      );
+        target: expense_id,
+        confirmToken: args.confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', `/update_expense/${expense_id}`, body);
       return minifiedResult(data);
@@ -207,20 +213,23 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_delete_expense',
     {
       description:
-        'Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore. Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it deletes.',
+        `Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore. ${CONFIRM_NOTE}`,
       annotations: { destructiveHint: true },
       inputSchema: z.object({
         id: z.number().describe('Expense ID to delete'),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, confirm }) => {
-      const gate = previewUnlessConfirmed(
-        confirm,
-        `Soft-delete Splitwise expense ${id}`,
-        'POST',
-        `/delete_expense/${id}`,
-      );
+    async ({ id, confirmToken }, ctx) => {
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_delete_expense',
+        action: 'expense.delete',
+        summary: `Soft-delete Splitwise expense ${id}`,
+        method: 'POST',
+        path: `/delete_expense/${id}`,
+        target: id,
+        confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', `/delete_expense/${id}`);
       return minifiedResult(data);

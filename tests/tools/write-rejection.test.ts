@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
 import { registerExpenseTools } from '../../src/tools/expenses.js';
 import { SplitwiseClient } from '../../src/client.js';
-import { createTestHarness } from '../helpers.js';
+import { confirmedCall, createTestHarness } from '../helpers.js';
 
 // End-to-end: drive real tools through a real SplitwiseClient with only
 // `fetch` stubbed, so a Splitwise write that returns HTTP 200 with an
@@ -51,8 +51,7 @@ describe('write rejections surface as tool errors (HTTP 200 with errors)', () =>
       expenses: [],
       errors: { base: ['An expense must have a cost'] },
     });
-    const result = await harness.callTool('sw_create_expense', {
-      confirm: true,
+    const { result } = await confirmedCall(harness, fetchMock, 'sw_create_expense', {
       group_id: 1,
       description: 'Dinner',
       cost: '50.00',
@@ -66,7 +65,7 @@ describe('write rejections surface as tool errors (HTTP 200 with errors)', () =>
 
   it('sw_delete_expense returns isError on {success: false, errors}', async () => {
     const { fetchMock, harness } = await stubBody({ success: false, errors: { base: ['Expense not found'] } });
-    const result = await harness.callTool('sw_delete_expense', { confirm: true, id: 42 });
+    const { result } = await confirmedCall(harness, fetchMock, 'sw_delete_expense', { id: 42 });
     expect(fetchMock).toHaveBeenCalled();
     expect(result.isError).toBe(true);
     expect(textOf(result)).toContain('Expense not found');
@@ -74,8 +73,7 @@ describe('write rejections surface as tool errors (HTTP 200 with errors)', () =>
 
   it('sw_create_expense succeeds when the errors object is empty', async () => {
     const { fetchMock, harness } = await stubBody({ expenses: [{ id: 5 }], errors: {} });
-    const result = await harness.callTool('sw_create_expense', {
-      confirm: true,
+    const { result } = await confirmedCall(harness, fetchMock, 'sw_create_expense', {
       group_id: 1,
       description: 'Dinner',
       cost: '50.00',

@@ -3,7 +3,7 @@ import { SW_VIEWS, viewGeneric } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { buildQueryString, minifiedResult, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
-import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
+import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
 
 export function registerUtilityTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool(
@@ -73,22 +73,25 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     'sw_create_comment',
     {
       description:
-        'Add a comment to a Splitwise expense (visible to other participants). Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it posts.',
+        `Add a comment to a Splitwise expense (visible to other participants). ${CONFIRM_NOTE}`,
       annotations: { destructiveHint: true },
       inputSchema: z.object({
         expense_id: z.number().describe('Expense ID to comment on'),
         content: z.string().describe('Comment text'),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ expense_id, content, confirm }) => {
-      const gate = previewUnlessConfirmed(
-        confirm,
-        `Comment on Splitwise expense ${expense_id} (visible to participants)`,
-        'POST',
-        '/create_comment',
-        { expense_id, content },
-      );
+    async ({ expense_id, content, confirmToken }, ctx) => {
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_create_comment',
+        action: 'comment.create',
+        summary: `Comment on Splitwise expense ${expense_id} (visible to participants)`,
+        method: 'POST',
+        path: '/create_comment',
+        body: { expense_id, content },
+        target: expense_id,
+        confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', '/create_comment', { expense_id, content });
       return minifiedResult(data);
@@ -99,20 +102,23 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     'sw_delete_comment',
     {
       description:
-        'Delete a comment by id. Without confirm:true this returns a dry-run preview and makes NO network call; with confirm:true it deletes.',
+        `Delete a comment by id. ${CONFIRM_NOTE}`,
       annotations: { destructiveHint: true },
       inputSchema: z.object({
         id: z.number().describe('Comment ID to delete'),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, confirm }) => {
-      const gate = previewUnlessConfirmed(
-        confirm,
-        `Delete Splitwise comment ${id}`,
-        'POST',
-        `/delete_comment/${id}`,
-      );
+    async ({ id, confirmToken }, ctx) => {
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_delete_comment',
+        action: 'comment.delete',
+        summary: `Delete Splitwise comment ${id}`,
+        method: 'POST',
+        path: `/delete_comment/${id}`,
+        target: id,
+        confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', `/delete_comment/${id}`);
       return minifiedResult(data);

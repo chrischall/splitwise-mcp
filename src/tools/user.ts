@@ -3,7 +3,7 @@ import { PERSON_VIEW_NOTE, SW_VIEWS, viewUser } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { minifiedResult, pruneUndefined, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
-import { previewUnlessConfirmed, schemaConfirm } from './_confirm.js';
+import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
 
 export function registerUserTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool(
@@ -43,11 +43,11 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
     'sw_update_user',
     {
       description:
-        "Update the current user's profile fields: name, locale and default currency. id must be the current user's id. The login email and password are deliberately not settable here — account credentials are changed in the Splitwise app, not by an assistant.",
+        "Update the current user's profile fields: name, locale and default currency. id must be the current user's id. The login email and password are deliberately not settable here — account credentials are changed in the Splitwise app, not by an assistant. " + CONFIRM_NOTE,
       annotations: { readOnlyHint: false, destructiveHint: true },
       // No `email` / `password`: changing the login email is an account
       // takeover primitive (a password reset to the new address follows), and
-      // the only gate would be a model-set `confirm` that injected text from
+      // the only gate would be a model-driven confirmation that injected text from
       // comments, notifications or receipts could talk it into (fleet-audit
       // #250). z.object strips unknown keys, so a caller passing them anyway
       // has them dropped before the request is built.
@@ -57,23 +57,26 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
         last_name: z.string().optional(),
         locale: z.string().optional(),
         default_currency: z.string().optional(),
-        confirm: schemaConfirm,
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, first_name, last_name, locale, default_currency, confirm }) => {
+    async ({ id, first_name, last_name, locale, default_currency, confirmToken }, ctx) => {
       const body = pruneUndefined({
         first_name,
         last_name,
         locale,
         default_currency,
       });
-      const gate = previewUnlessConfirmed(
-        confirm,
-        `Update current Splitwise user ${id} profile`,
-        'POST',
-        `/update_user/${id}`,
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_update_user',
+        action: 'user.update',
+        summary: `Update current Splitwise user ${id} profile`,
+        method: 'POST',
+        path: `/update_user/${id}`,
         body,
-      );
+        target: id,
+        confirmToken,
+      });
       if (gate) return gate;
       const data = await client.request('POST', `/update_user/${id}`, body);
       return minifiedResult(data);
