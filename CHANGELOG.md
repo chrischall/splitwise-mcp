@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.1](https://github.com/chrischall/splitwise-mcp/compare/v3.2.0...v3.2.1) (2026-09-25)
+
+
+### Bug Fixes
+
+* **deps:** bump dotenv from 17.4.2 to 18.0.2 in the production-majors group ([#212](https://github.com/chrischall/splitwise-mcp/issues/212)) ([ee120f9](https://github.com/chrischall/splitwise-mcp/commit/ee120f9754dbdbe5cc5d097269a5b9d73ddfe6b3))
+* **receipts:** keep a per-call output_dir inside SPLITWISE_OUTPUT_DIR ([#214](https://github.com/chrischall/splitwise-mcp/issues/214)) ([28125a6](https://github.com/chrischall/splitwise-mcp/commit/28125a691c3c46a53eddd39bd8f8cef841bdf1ce))
+
 ## [3.2.0](https://github.com/chrischall/splitwise-mcp/compare/v3.1.2...v3.2.0) (2026-09-24)
 
 
