@@ -3,6 +3,7 @@ import type { McpServer, CallToolResult } from '@modelcontextprotocol/server';
 import {
   minifiedResult,
   imageResult,
+  readEnvVar,
   resolveOutputDir,
   writeBinaryOutput,
   sniffMimeBytes,
@@ -136,7 +137,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
         output_dir: z
           .string()
           .describe(
-            'Directory to write the receipt into. Defaults to $SPLITWISE_OUTPUT_DIR, else the current working directory.',
+            'Directory to write the receipt into. Defaults to $SPLITWISE_OUTPUT_DIR, else the current working directory. When SPLITWISE_OUTPUT_DIR is set, this must be inside it.',
           )
           .optional(),
         write: z
@@ -177,8 +178,15 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
       let writeError: string | undefined;
       if (write !== false) {
         try {
+          // output_dir is model-chosen: once the operator configures
+          // SPLITWISE_OUTPUT_DIR, a per-call directory must stay inside it
+          // (an escape throws, landing in writeError below). Unset keeps the
+          // old, unconfined behaviour.
+          const configuredDir = readEnvVar('SPLITWISE_OUTPUT_DIR');
           path = writeBinaryOutput({
-            dir: resolveOutputDir(output_dir, 'SPLITWISE_OUTPUT_DIR'),
+            dir: resolveOutputDir(output_dir, 'SPLITWISE_OUTPUT_DIR', {
+              ...(configuredDir ? { allowedRoots: [configuredDir] } : {}),
+            }),
             baseName: `splitwise-receipt-${id}`,
             base64,
             extension: extensionFor(mimeType, url),

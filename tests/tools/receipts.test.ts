@@ -91,14 +91,21 @@ function expenseResponse(receipt: { original?: string | null; large?: string | n
 }
 
 let outputDir: string;
+let savedOutputEnv: string | undefined;
 
 beforeEach(() => {
   outputDir = mkdtempSync(join(tmpdir(), 'sw-receipts-'));
+  // Every test starts with SPLITWISE_OUTPUT_DIR unset, whatever the runner's
+  // env holds — it now decides whether a per-call output_dir is confined.
+  savedOutputEnv = process.env.SPLITWISE_OUTPUT_DIR;
+  delete process.env.SPLITWISE_OUTPUT_DIR;
 });
 
 afterEach(() => {
   rmSync(outputDir, { recursive: true, force: true });
   vi.unstubAllGlobals();
+  if (savedOutputEnv === undefined) delete process.env.SPLITWISE_OUTPUT_DIR;
+  else process.env.SPLITWISE_OUTPUT_DIR = savedOutputEnv;
 });
 
 /**
@@ -660,6 +667,80 @@ describe('sw_get_receipt', () => {
     expect(result.isError).toBe(true);
     expect(errorText(result)).toContain('https only');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await harness.close();
+  });
+});
+
+describe('sw_get_receipt output_dir confinement', () => {
+  // output_dir is a model-chosen argument; once the operator configures
+  // SPLITWISE_OUTPUT_DIR, a per-call directory must stay inside it.
+  let outside: string;
+
+  beforeEach(() => {
+    outside = mkdtempSync(join(tmpdir(), 'sw-receipts-outside-'));
+  });
+
+  afterEach(() => {
+    rmSync(outside, { recursive: true, force: true });
+  });
+
+  function receiptFetch() {
+    return vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(JPEG, 'image/jpeg'));
+  }
+
+  it('refuses an output_dir outside SPLITWISE_OUTPUT_DIR and reports it as a write error', async () => {
+    process.env.SPLITWISE_OUTPUT_DIR = outputDir;
+    const harness = await harnessWith(receiptFetch());
+    const target = join(outside, 'escaped');
+
+    const result = await harness.callTool('sw_get_receipt', {
+      id: 4644814211,
+      inline: true,
+      output_dir: target,
+    });
+    const body = parseToolResult<{ path?: string; write_error?: string; inline: boolean }>(result);
+
+    // Best-effort write: the refusal is reported, the call still succeeds.
+    expect(result.isError).toBeFalsy();
+    expect(body.path).toBeUndefined();
+    expect(body.write_error).toMatch(/outside the allowed directories/);
+    expect(body.inline).toBe(true);
+    // Nothing written or created outside the configured root.
+    expect(readdirSync(outside)).toEqual([]);
+    expect(readdirSync(outputDir)).toEqual([]);
+
+    await harness.close();
+  });
+
+  it('writes to an output_dir inside SPLITWISE_OUTPUT_DIR', async () => {
+    process.env.SPLITWISE_OUTPUT_DIR = outputDir;
+    const harness = await harnessWith(receiptFetch());
+    const target = join(outputDir, 'nested');
+
+    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: target });
+    const body = parseToolResult<{ path: string; write_error?: string }>(result);
+
+    expect(result.isError).toBeFalsy();
+    expect(body.write_error).toBeUndefined();
+    expect(readdirSync(target)).toEqual(['splitwise-receipt-4644814211.jpg']);
+    expect(new Uint8Array(readFileSync(body.path))).toEqual(JPEG);
+
+    await harness.close();
+  });
+
+  it('leaves output_dir unconfined when SPLITWISE_OUTPUT_DIR is unset', async () => {
+    const harness = await harnessWith(receiptFetch());
+    const target = join(outside, 'anywhere');
+
+    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: target });
+    const body = parseToolResult<{ path: string; write_error?: string }>(result);
+
+    expect(result.isError).toBeFalsy();
+    expect(body.write_error).toBeUndefined();
+    expect(readdirSync(target)).toEqual(['splitwise-receipt-4644814211.jpg']);
 
     await harness.close();
   });
