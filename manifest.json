@@ -49,7 +49,7 @@
     "splitwise_output_dir": {
       "type": "directory",
       "title": "Receipt Download Directory",
-      "description": "Where sw_get_receipt saves downloaded receipts. Leave blank to use the working directory.",
+      "description": "Where sw_get_receipt saves downloaded receipts. Leave blank to use the working directory. When set, a per-call output_dir must be inside it.",
       "required": false
     }
   },
