@@ -97,6 +97,9 @@ describe('SplitwiseClient', () => {
       ok: false,
       status: 401,
       statusText: 'Unauthorized',
+      // mcp-utils 2.10 reads a 401's headers to tell a CDN/WAF refusal page
+      // from a real rejection; a real fetch Response always carries them.
+      headers: new Headers(),
     }));
 
     const client = new SplitwiseClient();
