@@ -101,7 +101,7 @@ Do NOT manually bump versions or create tags unless the user explicitly asks. Ve
 
 ### Release workflow
 
-Commits land on `main` via PR. release-please (`.github/workflows/release-please.yml`) opens or updates a `chore(main): release X.Y.Z` PR whenever Conventional-Commit messages (`feat:`, `fix:`, etc.) accumulate. Merging the release PR (arm `ready-to-merge`) creates the tag and a GitHub Release; the `publish` job then packs a `.mcpb` bundle (`npx @anthropic-ai/mcpb pack`) and `.skill` zip, runs `npm publish --provenance`, and publishes to the MCP Registry via `mcp-publisher` (OIDC).
+Commits land on `main` via PR. release-please (`.github/workflows/release-please.yml`) opens or updates a `chore(main): release X.Y.Z` PR whenever Conventional-Commit messages (`feat:`, `fix:`, etc.) accumulate. Merging the release PR creates the tag and a GitHub Release; the `publish` job then packs a `.mcpb` bundle (`npx @anthropic-ai/mcpb pack`) and `.skill` zip, runs `npm publish --provenance`, and publishes to the MCP Registry via `mcp-publisher` (OIDC).
 
 <!-- pr-workflow:v3 -->
 ## Pull requests & release notes
