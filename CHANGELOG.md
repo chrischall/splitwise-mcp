@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.2.2](https://github.com/chrischall/splitwise-mcp/compare/v3.2.1...v3.2.2) (2026-10-03)
+
+
+### Bug Fixes
+
+* **deps:** bump @chrischall/mcp-utils to 2.12.0 ([#221](https://github.com/chrischall/splitwise-mcp/issues/221)) ([44904d2](https://github.com/chrischall/splitwise-mcp/commit/44904d2ae3d186849e7daba278dc8df8e70182e7))
+* **deps:** bump @chrischall/mcp-utils to 2.13.0 ([#223](https://github.com/chrischall/splitwise-mcp/issues/223)) ([6b236a0](https://github.com/chrischall/splitwise-mcp/commit/6b236a0cbbaf8a2647dc13bdd7496b5aec5294cc))
+* **deps:** bump the production-dependencies group with 2 updates ([#216](https://github.com/chrischall/splitwise-mcp/issues/216)) ([72201e6](https://github.com/chrischall/splitwise-mcp/commit/72201e6c46652808747fc47a8b01d179885e097b))
+* keep credentials and report edge_blocked on CDN/WAF blocks (mcp-utils 2.10.0) ([#219](https://github.com/chrischall/splitwise-mcp/issues/219)) ([48d4f1c](https://github.com/chrischall/splitwise-mcp/commit/48d4f1c07659a3809676218217b6b1096149706e))
+* keep write approvals valid across a hosted restart (mcp-utils 2.11.0) ([#220](https://github.com/chrischall/splitwise-mcp/issues/220)) ([b531b24](https://github.com/chrischall/splitwise-mcp/commit/b531b2423fa394cb125622edf71e450f88445c52))
+* report CDN/WAF blocks as edge_blocked, not a rejected credential (mcp-utils 2.9.0) ([#218](https://github.com/chrischall/splitwise-mcp/issues/218)) ([916f285](https://github.com/chrischall/splitwise-mcp/commit/916f28515164df7c6a51dfd62207e6ca799d39a9))
+
+
+### Documentation
+
+* stop telling agents to arm the release PR ([#222](https://github.com/chrischall/splitwise-mcp/issues/222)) ([63bf234](https://github.com/chrischall/splitwise-mcp/commit/63bf2341d5088c9fbba9c25468ac32b37a3d3c70))
+
 ## [3.2.1](https://github.com/chrischall/splitwise-mcp/compare/v3.2.0...v3.2.1) (2026-09-25)
 
 
