@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.2.3](https://github.com/chrischall/splitwise-mcp/compare/v3.2.2...v3.2.3) (2026-10-05)
+
+
+### Bug Fixes
+
+* **deps:** bump dotenv from 18.0.3 to 18.0.5 in the production-dependencies group ([#226](https://github.com/chrischall/splitwise-mcp/issues/226)) ([71b74c6](https://github.com/chrischall/splitwise-mcp/commit/71b74c60570d069e9ec0dd1fb11afa2a43a31f69))
+* **deps:** require @chrischall/mcp-utils 2.14.0 and MCP SDK 2.3.0 ([#228](https://github.com/chrischall/splitwise-mcp/issues/228)) ([d553c77](https://github.com/chrischall/splitwise-mcp/commit/d553c7726180e5f4507432f21587a5f55526eb30))
+
 ## [3.2.2](https://github.com/chrischall/splitwise-mcp/compare/v3.2.1...v3.2.2) (2026-10-03)
 
 
