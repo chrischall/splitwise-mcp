@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.3.0](https://github.com/chrischall/splitwise-mcp/compare/v3.2.3...v3.3.0) (2026-10-07)
+
+
+### Features
+
+* **deps:** support MCP_CONFIRM_ELICITATION=off for clients that never show the confirm prompt ([#229](https://github.com/chrischall/splitwise-mcp/issues/229)) ([4649811](https://github.com/chrischall/splitwise-mcp/commit/4649811c0bfdd7d6496068e14dde676a778384cf))
+
+
+### Bug Fixes
+
+* **deps:** bump source-map-js from 1.2.1 to 1.2.2 in the security group across 1 directory ([#231](https://github.com/chrischall/splitwise-mcp/issues/231)) ([bda687b](https://github.com/chrischall/splitwise-mcp/commit/bda687b6961e7850bf11e20d384392b8d767ca03))
+
+
+### Documentation
+
+* document MCP_CONFIRM_ELICITATION ([#232](https://github.com/chrischall/splitwise-mcp/issues/232)) ([b0cada7](https://github.com/chrischall/splitwise-mcp/commit/b0cada780bce53e5ce3d0a324ca20535ff4f8473))
+* note MCP_CONFIRM_ELICITATION=off in the skill's confirmation note ([#234](https://github.com/chrischall/splitwise-mcp/issues/234)) ([7741ef5](https://github.com/chrischall/splitwise-mcp/commit/7741ef5eb9f6b40de87a8754742c7a6699cc0fb1))
+
 ## [3.2.3](https://github.com/chrischall/splitwise-mcp/compare/v3.2.2...v3.2.3) (2026-10-05)
 
 
