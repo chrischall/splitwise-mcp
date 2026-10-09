@@ -133,7 +133,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
       // `readOnlyHint` is what a host reads when deciding to skip its approval
       // prompt. Not destructive either — `uniquePath` always picks a filename
       // that doesn't exist, so an existing file is never touched.
-      annotations: { readOnlyHint: false, destructiveHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
       inputSchema: z.object({
         id: z.number().describe('Expense ID (the same id sw_get_expense takes)'),
         size: z

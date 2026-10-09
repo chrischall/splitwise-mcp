@@ -66,7 +66,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `List or search Splitwise expenses. All filters are optional. Use group_id to filter by group, dated_after/dated_before for date ranges. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: true },
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
           note: 'compact keeps the share breakdown, repayments and receipt presence and drops the avatars and the repeat/reminder/transaction block; "full" returns Splitwise\'s whole records.',
@@ -115,7 +115,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_get_expense',
     {
       description: `Get full details of a single Splitwise expense by id. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: true },
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
           note: 'compact keeps the share breakdown, repayments and receipt presence and drops the avatars and the repeat/reminder/transaction block; "full" returns Splitwise\'s whole records.',
@@ -133,8 +133,8 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_create_expense',
     {
       description:
-        `Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: false },
+        `Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. This puts charges on every participant's balance and notifies them. ${CONFIRM_NOTE}`,
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         group_id: z.number().describe('Group to add expense to (use 0 for no group)'),
         description: z.string().describe('Short description of the expense'),
@@ -183,7 +183,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split). ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         expense_id: z.number().describe('ID of the expense to update'),
         description: z.string().optional(),
@@ -227,7 +227,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore. ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         id: z.number().describe('Expense ID to delete'),
         confirmToken: confirmTokenParam,
@@ -256,9 +256,9 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Restore a soft-deleted Splitwise expense. This puts its charges back on every participant's balance and notifies them, so it is gated like the other writes. ${CONFIRM_NOTE}`,
-      // Not read-only (it changes balances), but additive rather than
-      // destructive: it brings back a record, and the delete tool undoes it.
-      annotations: { readOnlyHint: false, destructiveHint: false },
+      // Destructive despite the delete tool being its record-level inverse:
+      // the restore notifies every participant, and no later call un-sends that.
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         id: z.number().describe('Expense ID to restore'),
         confirmToken: confirmTokenParam,
