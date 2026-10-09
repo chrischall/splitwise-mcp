@@ -122,11 +122,18 @@ describe('group tools', () => {
   });
 
   describe('sw_undelete_group', () => {
-    it('calls POST /undelete_group/42', async () => {
+    it('is confirm-gated: previews first, then calls POST /undelete_group/42 with the token', async () => {
       mockRequest.mockResolvedValue({ success: true });
-      const result = await harness.callTool('sw_undelete_group', { id: 42 });
+      const { phase1, result } = await confirmedCall(harness, mockRequest, 'sw_undelete_group', { id: 42 });
+      expect(phase1.preview).toMatchObject({ method: 'POST', path: '/undelete_group/42' });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/undelete_group/42');
       expect(result.isError).toBeFalsy();
+    });
+
+    it('is annotated as a non-read-only, non-destructive (additive) write', async () => {
+      const tool = (await harness.client.listTools()).tools.find((t) => t.name === 'sw_undelete_group');
+      expect(tool!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+      expect(tool!.description).toContain('confirmToken');
     });
   });
 });

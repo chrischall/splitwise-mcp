@@ -239,12 +239,27 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
   server.registerTool(
     'sw_undelete_expense',
     {
-      description: 'Restore a soft-deleted Splitwise expense.',
+      description:
+        `Restore a soft-deleted Splitwise expense. This puts its charges back on every participant's balance and notifies them, so it is gated like the other writes. ${CONFIRM_NOTE}`,
+      // Not read-only (it changes balances), but additive rather than
+      // destructive: it brings back a record, and the delete tool undoes it.
+      annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: z.object({
         id: z.number().describe('Expense ID to restore'),
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id }) => {
+    async ({ id, confirmToken }, ctx) => {
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_undelete_expense',
+        action: 'expense.undelete',
+        summary: `Restore soft-deleted Splitwise expense ${id} — puts it back on balances and notifies its participants`,
+        method: 'POST',
+        path: `/undelete_expense/${id}`,
+        target: id,
+        confirmToken,
+      });
+      if (gate) return gate;
       const data = await client.request('POST', `/undelete_expense/${id}`);
       return minifiedResult(data);
     },
