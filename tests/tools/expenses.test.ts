@@ -57,6 +57,27 @@ describe('sw_list_expenses', () => {
     await harness.callTool('sw_list_expenses', { group_id: 5, limit: 10 });
     expect(mockRequest).toHaveBeenCalledWith('GET', '/get_expenses?group_id=5&limit=10');
   });
+
+  // Splitwise treats limit=0 as "return everything" — an unbounded result the
+  // host refuses — so limit is 1..200 and offset a non-negative integer.
+  it.each([
+    { limit: 0 },
+    { limit: 201 },
+    { limit: 2.5 },
+    { limit: -1 },
+    { offset: -1 },
+    { offset: 1.5 },
+  ])('rejects out-of-range pagination %o without calling Splitwise', async (args) => {
+    const result = await harness.callTool('sw_list_expenses', args);
+    expect(result.isError).toBe(true);
+    expect(mockRequest).not.toHaveBeenCalled();
+  });
+
+  it('accepts the bounds limit:200, offset:0', async () => {
+    mockRequest.mockResolvedValue({ expenses: [] });
+    await harness.callTool('sw_list_expenses', { limit: 200, offset: 0 });
+    expect(mockRequest).toHaveBeenCalledWith('GET', '/get_expenses?limit=200&offset=0');
+  });
 });
 
 describe('sw_get_expense', () => {

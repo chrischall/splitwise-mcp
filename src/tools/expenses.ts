@@ -82,8 +82,16 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
           .optional(),
         updated_after: z.string().describe('ISO 8601 datetime').optional(),
         updated_before: z.string().describe('ISO 8601 datetime').optional(),
-        limit: z.number().describe('Max results (API default: 20)').optional(),
-        offset: z.number().describe('Pagination offset').optional(),
+        // Bounded: Splitwise reads limit=0 as "return everything", an
+        // unbounded result the host refuses.
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .describe('Max results, 1-200 (API default: 20). Page with offset for more.')
+          .optional(),
+        offset: z.number().int().min(0).describe('Pagination offset').optional(),
       }),
     },
     async (args) => {

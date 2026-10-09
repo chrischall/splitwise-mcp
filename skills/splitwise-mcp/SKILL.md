@@ -230,4 +230,4 @@ sw_update_expense(expense_id, description: "Corrected description", cost: "95.00
 - `sw_get_receipt` writes into `output_dir`, else `$SPLITWISE_OUTPUT_DIR`, else the working directory, and never overwrites an existing file
 - That path is on the **server's** filesystem. If you can't read it — a hosted or containerised server — use `inline: true` (bytes) or `extract_text: true` (PDF text) instead of the path
 - `extract_text` only works on PDFs, and only when the PDF has a text layer; a scanned or photographed receipt returns `text_note` instead, and needs `inline: true` to read
-- API default for `sw_list_expenses` is 20 results when `limit` is omitted
+- API default for `sw_list_expenses` is 20 results when `limit` is omitted; `limit` is 1-200 (there is no "all" — page with `offset`)
