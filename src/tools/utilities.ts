@@ -74,7 +74,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Add a comment to a Splitwise expense (visible to other participants). ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: z.object({
         expense_id: z.number().describe('Expense ID to comment on'),
         content: z.string().describe('Comment text'),
@@ -103,7 +103,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Delete a comment by id. ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: z.object({
         id: z.number().describe('Comment ID to delete'),
         confirmToken: confirmTokenParam,

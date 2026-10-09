@@ -125,6 +125,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. ${CONFIRM_NOTE}`,
+      annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: z.object({
         group_id: z.number().describe('Group to add expense to (use 0 for no group)'),
         description: z.string().describe('Short description of the expense'),
@@ -172,6 +173,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split). ${CONFIRM_NOTE}`,
+      annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: z.object({
         expense_id: z.number().describe('ID of the expense to update'),
         description: z.string().optional(),
@@ -214,7 +216,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore. ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: z.object({
         id: z.number().describe('Expense ID to delete'),
         confirmToken: confirmTokenParam,

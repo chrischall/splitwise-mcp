@@ -46,7 +46,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     'sw_create_group',
     {
       description: `Create a new Splitwise group. ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: z.object({
         name: z.string().describe('Group name'),
         group_type: z
@@ -83,6 +83,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     {
       description:
         `Add a user to a Splitwise group. Provide user_id (preferred, use sw_list_friends to resolve a name) or first_name + last_name + email to invite by email. ${CONFIRM_NOTE}`,
+      annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: z.object({
         group_id: z.number().describe('Group ID'),
         user_id: z.number().describe('User ID (preferred)').optional(),
@@ -125,7 +126,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     {
       description:
         `Remove a user from a Splitwise group. ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: z.object({
         group_id: z.number().describe('Group ID'),
         user_id: z.number().describe('User ID to remove'),
@@ -154,7 +155,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     {
       description:
         `Soft-delete a Splitwise group. ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: z.object({
         id: z.number().describe('Group ID to delete'),
         confirmToken: confirmTokenParam,
