@@ -82,7 +82,8 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ expense_id, content, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { expense_id, content, confirmToken } = args;
       const gate = await confirmWrite(ctx, {
         tool: 'sw_create_comment',
         action: 'comment.create',
@@ -92,6 +93,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
         body: { expense_id, content },
         target: expense_id,
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', '/create_comment', { expense_id, content });
@@ -110,7 +112,8 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { id, confirmToken } = args;
       const gate = await confirmWrite(ctx, {
         tool: 'sw_delete_comment',
         action: 'comment.delete',
@@ -119,6 +122,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
         path: `/delete_comment/${id}`,
         target: id,
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', `/delete_comment/${id}`);

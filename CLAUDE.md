@@ -27,7 +27,8 @@ src/
   index.ts        # MCP server entry — calls runMcp() from @chrischall/mcp-utils
                   #   with name/version/banner + the register*Tools array
   client.ts       # SplitwiseClient (createApiClient wrapper) + exported `client`
-                  #   singleton; reads SPLITWISE_API_KEY, 1× 2s retry, 30s timeout
+                  #   singleton; reads SPLITWISE_API_KEY, 1× 2s retry, 30s timeout,
+                  #   16 MiB response cap (receipts: 25 MiB per call)
   tools/
     user.ts       # sw_get_current_user, sw_get_user, sw_update_user
     groups.ts     # sw_list_groups, sw_get_group, sw_create_group,
@@ -51,7 +52,7 @@ Each tool file exports a `register<Domain>Tools(server, client)` function that c
 
 ```
 SPLITWISE_API_KEY=<your key>   # Required. From https://secure.splitwise.com/apps/register
-SPLITWISE_OUTPUT_DIR=<path>    # Optional. Where sw_get_receipt writes files (default: $TMPDIR/splitwise-mcp, mode 0600)
+SPLITWISE_OUTPUT_DIR=<path>    # Optional. Where sw_get_receipt writes files (default: ~/Downloads/splitwise-mcp, dir 0700, files 0600)
 ```
 
 Loaded via `loadDotenvSafely` (from `@chrischall/mcp-utils`) from `.env` next to `dist/`, with `override: false` so a host-provided value always wins; a missing `dotenv` module is swallowed (mcpb bundles externalize it — see `bundle` script's `--external:dotenv` — and the host provides env). `readEnvVar` (also from `@chrischall/mcp-utils`) treats blank, `"undefined"`, `"null"`, and unsubstituted `${FOO}` placeholders as unset.

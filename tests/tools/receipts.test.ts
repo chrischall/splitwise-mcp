@@ -69,20 +69,17 @@ function makePdf(lines: string[]): Uint8Array {
 const TEXT_PDF = makePdf(['MPHSBANDS Band Shirts', 'Total 129.00 USD']);
 const SCANNED_PDF = makePdf([]);
 
-/** A JSON response as `createApiClient` consumes it (it calls `.text()`). */
+/** A JSON response. A real `Response`: mcp-utils 3 streams `res.body` under a size cap. */
 function jsonResponse(data: unknown) {
-  return { ok: true, status: 200, headers: new Headers(), text: async () => JSON.stringify(data) };
+  return new Response(JSON.stringify(data), { status: 200 });
 }
 
-/** A binary response as `fetchRaw` consumes it (headers + `.arrayBuffer()`). */
+/** A binary response as `fetchRaw` consumes it (headers + streamed body). */
 function binaryResponse(bytes: Uint8Array, contentType?: string) {
-  return {
-    ok: true,
+  return new Response(bytes, {
     status: 200,
-    headers: new Headers(contentType ? { 'content-type': contentType } : {}),
-    arrayBuffer: async () =>
-      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-  };
+    headers: contentType ? { 'content-type': contentType } : {},
+  });
 }
 
 /** `GET /get_expense/:id` shaped like the real API, with the given receipt. */
@@ -91,10 +88,17 @@ function expenseResponse(receipt: { original?: string | null; large?: string | n
 }
 
 let outputDir: string;
+let fakeHome: string;
 let savedOutputEnv: string | undefined;
+let savedHome: string | undefined;
 
 beforeEach(() => {
   outputDir = mkdtempSync(join(tmpdir(), 'sw-receipts-'));
+  // The default output dir is ~/Downloads/splitwise-mcp; point HOME at a
+  // scratch dir so no test writes into the real one.
+  fakeHome = mkdtempSync(join(tmpdir(), 'sw-receipts-home-'));
+  savedHome = process.env.HOME;
+  process.env.HOME = fakeHome;
   // Every test starts with SPLITWISE_OUTPUT_DIR unset, whatever the runner's
   // env holds — it now decides whether a per-call output_dir is confined.
   savedOutputEnv = process.env.SPLITWISE_OUTPUT_DIR;
@@ -103,6 +107,9 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(outputDir, { recursive: true, force: true });
+  rmSync(fakeHome, { recursive: true, force: true });
+  if (savedHome === undefined) delete process.env.HOME;
+  else process.env.HOME = savedHome;
   vi.unstubAllGlobals();
   if (savedOutputEnv === undefined) delete process.env.SPLITWISE_OUTPUT_DIR;
   else process.env.SPLITWISE_OUTPUT_DIR = savedOutputEnv;
@@ -570,12 +577,7 @@ describe('sw_get_receipt', () => {
   it('never leaks a signed receipt URL into an error message', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(expenseResponse({ original: S3_RECEIPT_URL }))
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 403,
-        headers: new Headers(),
-        text: async () => '<Error><Code>AccessDenied</Code></Error>',
-      });
+      .mockResolvedValueOnce(new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }));
     const harness = await harnessWith(fetchMock);
 
     const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
@@ -640,12 +642,11 @@ describe('sw_get_receipt', () => {
     // path the error formatter happens to name.
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(expenseResponse({ original: S3_RECEIPT_URL }))
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 403,
-        headers: new Headers(),
-        text: async () => `<Error><Code>SignatureDoesNotMatch</Code><StringToSign>${S3_RECEIPT_URL}</StringToSign></Error>`,
-      });
+      .mockResolvedValueOnce(
+        new Response(`<Error><Code>SignatureDoesNotMatch</Code><StringToSign>${S3_RECEIPT_URL}</StringToSign></Error>`, {
+          status: 403,
+        }),
+      );
     const harness = await harnessWith(fetchMock);
 
     const message = errorText(await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir }));
@@ -786,18 +787,16 @@ describe('sw_get_receipt file-write defaults', () => {
     await harness.close();
   });
 
-  it('defaults to a directory under the OS temp dir, not the working directory', async () => {
+  it('defaults to ~/Downloads/splitwise-mcp (owner-only), not the working directory', async () => {
     const harness = await harnessWith(fetchJpeg());
 
     const body = parseToolResult<{ path: string }>(
       await harness.callTool('sw_get_receipt', { id: 4644814211 }),
     );
-    try {
-      expect(body.path.startsWith(join(tmpdir(), 'splitwise-mcp'))).toBe(true);
-      expect(body.path.startsWith(process.cwd())).toBe(false);
-    } finally {
-      rmSync(body.path, { force: true });
-    }
+    const defaultDir = join(fakeHome, 'Downloads', 'splitwise-mcp');
+    expect(body.path.startsWith(defaultDir)).toBe(true);
+    expect(body.path.startsWith(process.cwd())).toBe(false);
+    expect(statSync(defaultDir).mode & 0o777).toBe(0o700);
 
     await harness.close();
   });
@@ -816,6 +815,50 @@ describe('sw_get_receipt file-write defaults', () => {
 
 // fleet-audit #737: a receipt's text layer is whatever the uploader put in the
 // PDF, so it is fenced as untrusted like comments and descriptions.
+describe('sw_get_receipt download size cap', () => {
+  it('refuses a receipt over 25 MiB without reading it, and writes nothing', async () => {
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>(
+      { pull(c) { pulled++; c.enqueue(JPEG); c.close(); } },
+      { highWaterMark: 0 },
+    );
+    const oversized = new Response(body, {
+      status: 200,
+      headers: { 'content-type': 'image/jpeg', 'content-length': String(25 * 1024 * 1024 + 1) },
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(oversized);
+    const harness = await harnessWith(fetchMock);
+
+    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    expect(result.isError).toBe(true);
+    expect(pulled).toBe(0);
+    expect(JSON.stringify(result)).toMatch(/limit/);
+    expect(readdirSync(outputDir)).toEqual([]);
+
+    await harness.close();
+  });
+  it('allows a receipt larger than the client-wide JSON cap but within 25 MiB', async () => {
+    // Declared length only: the cap check reads Content-Length before the body.
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(
+        new Response(JPEG, {
+          status: 200,
+          headers: { 'content-type': 'image/jpeg', 'content-length': String(20 * 1024 * 1024) },
+        }),
+      );
+    const harness = await harnessWith(fetchMock);
+
+    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    expect(result.isError).toBeFalsy();
+    expect(readdirSync(outputDir)).toHaveLength(1);
+
+    await harness.close();
+  });
+});
+
 describe('sw_get_receipt untrusted text', () => {
   it('fences extracted PDF text as untrusted, markers first', async () => {
     const fetchMock = vi.fn()

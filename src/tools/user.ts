@@ -60,7 +60,8 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, first_name, last_name, locale, default_currency, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { id, first_name, last_name, locale, default_currency, confirmToken } = args;
       const body = pruneUndefined({
         first_name,
         last_name,
@@ -76,6 +77,7 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
         body,
         target: id,
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', `/update_user/${id}`, body);

@@ -1,5 +1,3 @@
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { z } from 'zod';
 import type { McpServer, CallToolResult } from '@modelcontextprotocol/server';
 import {
@@ -30,12 +28,20 @@ const MAX_TEXT_CHARS = 100_000;
 const PDF_MIME = 'application/pdf';
 
 /**
- * Where a receipt goes when neither output_dir nor SPLITWISE_OUTPUT_DIR names
- * a place. Not the working directory: under Claude Code that is usually the
- * user's git repo, where a receipt (financial PII) can be committed and pushed
- * by accident (fleet-audit #738).
+ * Names the default output dir, `~/Downloads/splitwise-mcp` (created 0700), used
+ * when neither output_dir nor SPLITWISE_OUTPUT_DIR names a place. Not the
+ * working directory: under Claude Code that is usually the user's git repo,
+ * where a receipt (financial PII) can be committed and pushed by accident
+ * (fleet-audit #738).
  */
-const DEFAULT_OUTPUT_DIR = join(tmpdir(), 'splitwise-mcp');
+const OUTPUT_DIR_NAME = 'splitwise-mcp';
+
+/**
+ * Cap on a receipt download. Bounds the body read (a Content-Length over it is
+ * refused before reading; a stream that grows past it is cancelled) so a
+ * hostile or broken asset host cannot exhaust memory (fleet-audit #733).
+ */
+const MAX_RECEIPT_BYTES = 25 * 1024 * 1024;
 
 /** Receipts are written owner-only — they carry financial details. */
 const RECEIPT_FILE_MODE = 0o600;
@@ -122,7 +128,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
     'sw_get_receipt',
     {
       description:
-        "Download the receipt image or PDF attached to a Splitwise expense. The receipt URLs returned by sw_get_expense need the server's credentials — fetching them directly returns 401 — so use this tool instead. Set inline:true to get the bytes back in the result (images AND PDFs), or extract_text:true to get a PDF's text without the binary at all — both work when the caller can't see this server's filesystem. Without either, it writes the file (to $SPLITWISE_OUTPUT_DIR, else the OS temp directory) and returns the path; with either, it writes only when output_dir or write:true asks for it. Extracted text: " + UNTRUSTED_DESCRIPTION_SUFFIX,
+        "Download the receipt image or PDF attached to a Splitwise expense. The receipt URLs returned by sw_get_expense need the server's credentials — fetching them directly returns 401 — so use this tool instead. Set inline:true to get the bytes back in the result (images AND PDFs), or extract_text:true to get a PDF's text without the binary at all — both work when the caller can't see this server's filesystem. Without either, it writes the file (to $SPLITWISE_OUTPUT_DIR, else ~/Downloads/splitwise-mcp) and returns the path; with either, it writes only when output_dir or write:true asks for it. Extracted text: " + UNTRUSTED_DESCRIPTION_SUFFIX,
       // Not read-only: this writes a file into a caller-supplied directory, and
       // `readOnlyHint` is what a host reads when deciding to skip its approval
       // prompt. Not destructive either — `uniquePath` always picks a filename
@@ -151,7 +157,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
         output_dir: z
           .string()
           .describe(
-            'Directory to write the receipt into. Defaults to $SPLITWISE_OUTPUT_DIR, else a splitwise-mcp folder in the OS temp directory. When SPLITWISE_OUTPUT_DIR is set, this must be inside it.',
+            'Directory to write the receipt into. Defaults to $SPLITWISE_OUTPUT_DIR, else ~/Downloads/splitwise-mcp. When SPLITWISE_OUTPUT_DIR is set, this must be inside it.',
           )
           .optional(),
         write: z
@@ -176,7 +182,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
       }
       const served: ReceiptSize = receipt?.[wanted] ? wanted : fallback;
 
-      const asset = await client.fetchAsset(url);
+      const asset = await client.fetchAsset(url, { maxBytes: MAX_RECEIPT_BYTES });
       if (asset.bytes.length === 0) {
         throw new Error(`Splitwise returned an empty receipt body for expense ${id}.`);
       }
@@ -203,7 +209,8 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
           // old, unconfined behaviour.
           const configuredDir = readEnvVar('SPLITWISE_OUTPUT_DIR');
           path = writeBinaryOutput({
-            dir: resolveOutputDir(output_dir ?? (configuredDir ? undefined : DEFAULT_OUTPUT_DIR), 'SPLITWISE_OUTPUT_DIR', {
+            dir: resolveOutputDir(output_dir, 'SPLITWISE_OUTPUT_DIR', {
+              name: OUTPUT_DIR_NAME,
               ...(configuredDir ? { allowedRoots: [configuredDir] } : {}),
             }),
             baseName: `splitwise-receipt-${id}`,

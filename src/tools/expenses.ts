@@ -170,6 +170,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         body,
         target: args.group_id,
         confirmToken: args.confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', '/create_expense', body);
@@ -213,6 +214,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         body,
         target: expense_id,
         confirmToken: args.confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', `/update_expense/${expense_id}`, body);
@@ -231,7 +233,8 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { id, confirmToken } = args;
       const gate = await confirmWrite(ctx, {
         tool: 'sw_delete_expense',
         action: 'expense.delete',
@@ -240,6 +243,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         path: `/delete_expense/${id}`,
         target: id,
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', `/delete_expense/${id}`);
@@ -260,7 +264,8 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { id, confirmToken } = args;
       const gate = await confirmWrite(ctx, {
         tool: 'sw_undelete_expense',
         action: 'expense.undelete',
@@ -269,6 +274,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         path: `/undelete_expense/${id}`,
         target: id,
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', `/undelete_expense/${id}`);

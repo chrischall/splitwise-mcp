@@ -60,7 +60,8 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ name, group_type, simplify_by_default, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { name, group_type, simplify_by_default, confirmToken } = args;
       const body = pruneUndefined({ name, group_type, simplify_by_default });
       const gate = await confirmWrite(ctx, {
         tool: 'sw_create_group',
@@ -71,6 +72,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
         body,
         target: '',
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', '/create_group', body);
@@ -93,7 +95,8 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ group_id, user_id, first_name, last_name, email, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { group_id, user_id, first_name, last_name, email, confirmToken } = args;
       let body: Record<string, unknown>;
       if (user_id !== undefined) {
         body = { group_id, user_id };
@@ -114,6 +117,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
         body,
         target: group_id,
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', '/add_user_to_group', body);
@@ -133,7 +137,8 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ group_id, user_id, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { group_id, user_id, confirmToken } = args;
       const gate = await confirmWrite(ctx, {
         tool: 'sw_remove_user_from_group',
         action: 'group.remove_user',
@@ -143,6 +148,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
         body: { group_id, user_id },
         target: group_id,
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', '/remove_user_from_group', { group_id, user_id });
@@ -161,7 +167,8 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { id, confirmToken } = args;
       const gate = await confirmWrite(ctx, {
         tool: 'sw_delete_group',
         action: 'group.delete',
@@ -170,6 +177,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
         path: `/delete_group/${id}`,
         target: id,
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', `/delete_group/${id}`);
@@ -190,7 +198,8 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { id, confirmToken } = args;
       const gate = await confirmWrite(ctx, {
         tool: 'sw_undelete_group',
         action: 'group.undelete',
@@ -199,6 +208,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
         path: `/undelete_group/${id}`,
         target: id,
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', `/undelete_group/${id}`);

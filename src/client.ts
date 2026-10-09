@@ -27,6 +27,14 @@ const SERVICE_NAME = 'Splitwise';
 const SPLITWISE_DOMAIN = 'splitwise.com';
 
 /**
+ * Client-wide cap on any body read (fleet-audit #733). Generous for the
+ * largest JSON listing Splitwise returns, small enough that a broken or
+ * hostile upstream cannot exhaust memory. A call can override it with
+ * `maxBytes` (the receipt download does).
+ */
+export const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
+
+/**
  * Whether a hostname belongs to Splitwise, and may therefore be sent the API
  * key. Receipt bytes are served either from a Splitwise host (which requires
  * the key) or from a presigned third-party URL (S3), which must never see it.
@@ -167,6 +175,7 @@ export class SplitwiseClient {
       serviceName: service,
       retry: { count: 1, delayMs: 2000 },
       timeout: 30_000,
+      maxResponseBytes: MAX_RESPONSE_BYTES,
       ...(authenticated ? { getToken: () => this.requireKey() } : {}),
       onUnauthorized: () =>
         new Error(
@@ -198,8 +207,11 @@ export class SplitwiseClient {
    *
    * A cross-origin redirect (API → S3) is safe: per the Fetch standard the
    * `Authorization` header is dropped when a redirect changes origin.
+   *
+   * `maxBytes` overrides the client-wide body cap for this download; over it,
+   * the read is refused (`ResponseTooLargeError`, `kind: 'too_large'`).
    */
-  async fetchAsset(url: string): Promise<RawApiResponse> {
+  async fetchAsset(url: string, opts: { maxBytes?: number } = {}): Promise<RawApiResponse> {
     const target = parseAssetUrl(url);
     const authenticated = isSplitwiseHost(target.hostname);
     const cacheKey = `${target.origin}|${authenticated ? 'auth' : 'anon'}`;
@@ -214,7 +226,11 @@ export class SplitwiseClient {
       // `pathname + search` verbatim rather than the client's `query` option:
       // a presigned signature covers the exact encoding, so re-encoding it
       // would invalidate the URL.
-      return await api.fetchRaw('GET', `${target.pathname}${target.search}`);
+      return await api.fetchRaw(
+        'GET',
+        `${target.pathname}${target.search}`,
+        opts.maxBytes !== undefined ? { maxBytes: opts.maxBytes } : {},
+      );
     } catch (err) {
       throw redactAssetQuery(err, target.search);
     }
