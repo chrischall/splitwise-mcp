@@ -4,7 +4,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // The client module reads env at construction time, so set the env var before importing.
 process.env.SPLITWISE_API_KEY = 'test-key';
 
-const { SplitwiseClient } = await import('../src/client.js');
+const { SplitwiseClient, MAX_RESPONSE_BYTES } = await import('../src/client.js');
+const { WriteOutcomeUnknownError } = await import('@chrischall/mcp-utils');
+
+/** A real fetch Response: mcp-utils 3 streams `res.body` under a size cap. */
+function jsonResponse(data: unknown, init: ResponseInit = {}): Response {
+  return new Response(JSON.stringify(data), { status: 200, ...init });
+}
 
 describe('SplitwiseClient', () => {
   beforeEach(() => {
@@ -34,11 +40,7 @@ describe('SplitwiseClient', () => {
   it('uses an injected apiKey over the environment (hosted per-user seam)', async () => {
     // The constructor seam a hosted per-user deployment uses: build one client
     // per request with that user's key injected, bypassing the process env.
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify({ user: { id: 1 } }),
-    });
+    const mockFetch = vi.fn().mockImplementation(async () => jsonResponse({ user: { id: 1 } }));
     vi.stubGlobal('fetch', mockFetch);
 
     const client = new SplitwiseClient({ apiKey: 'injected-user-key' });
@@ -55,11 +57,7 @@ describe('SplitwiseClient', () => {
   });
 
   it('sends Authorization header with Bearer token', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify({ user: { id: 1 } }),
-    });
+    const mockFetch = vi.fn().mockImplementation(async () => jsonResponse({ user: { id: 1 } }));
     vi.stubGlobal('fetch', mockFetch);
 
     const client = new SplitwiseClient();
@@ -76,11 +74,7 @@ describe('SplitwiseClient', () => {
   });
 
   it('bounds every request with a timeout (passes an AbortSignal to fetch)', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => '{}',
-    });
+    const mockFetch = vi.fn().mockImplementation(async () => jsonResponse({}));
     vi.stubGlobal('fetch', mockFetch);
 
     const client = new SplitwiseClient();
@@ -93,14 +87,9 @@ describe('SplitwiseClient', () => {
   });
 
   it('throws on 401', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 401,
-      statusText: 'Unauthorized',
-      // mcp-utils 2.10 reads a 401's headers to tell a CDN/WAF refusal page
-      // from a real rejection; a real fetch Response always carries them.
-      headers: new Headers(),
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(
+      async () => new Response(null, { status: 401, statusText: 'Unauthorized' }),
+    ));
 
     const client = new SplitwiseClient();
     await expect(client.request('GET', '/get_current_user')).rejects.toThrow(
@@ -110,8 +99,8 @@ describe('SplitwiseClient', () => {
 
   it('retries once on 429 then succeeds', async () => {
     const mockFetch = vi.fn()
-      .mockResolvedValueOnce({ ok: false, status: 429, statusText: 'Too Many Requests' })
-      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => JSON.stringify({ ok: true }) });
+      .mockImplementationOnce(async () => new Response(null, { status: 429, statusText: 'Too Many Requests' }))
+      .mockImplementationOnce(async () => jsonResponse({ ok: true }));
     vi.stubGlobal('fetch', mockFetch);
     vi.useFakeTimers();
 
@@ -126,12 +115,9 @@ describe('SplitwiseClient', () => {
   });
 
   it('throws after two 429 responses', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 429,
-      statusText: 'Too Many Requests',
-      headers: new Headers(),
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(
+      async () => new Response(null, { status: 429, statusText: 'Too Many Requests' }),
+    ));
     vi.useFakeTimers();
 
     const client = new SplitwiseClient();
@@ -143,12 +129,9 @@ describe('SplitwiseClient', () => {
   });
 
   it('throws on other non-2xx errors', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-      text: async () => '',
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(
+      async () => new Response('', { status: 500, statusText: 'Internal Server Error' }),
+    ));
 
     const client = new SplitwiseClient();
     await expect(client.request('GET', '/get_current_user')).rejects.toThrow(
@@ -157,12 +140,13 @@ describe('SplitwiseClient', () => {
   });
 
   it('surfaces (redacted, truncated) upstream error body on non-2xx', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 400,
-      statusText: 'Bad Request',
-      text: async () => JSON.stringify({ errors: { base: ['Invalid expense'] } }),
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ errors: { base: ['Invalid expense'] } }), {
+          status: 400,
+          statusText: 'Bad Request',
+        }),
+    ));
 
     const client = new SplitwiseClient();
     await expect(client.request('POST', '/create_expense', {})).rejects.toThrow(
@@ -171,12 +155,9 @@ describe('SplitwiseClient', () => {
   });
 
   it('blames the asset host, not Splitwise, for a 429 on the anonymous path', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 429,
-      statusText: 'Too Many Requests',
-      headers: new Headers(),
-    });
+    const mockFetch = vi.fn().mockImplementation(
+      async () => new Response(null, { status: 429, statusText: 'Too Many Requests' }),
+    );
     vi.stubGlobal('fetch', mockFetch);
     vi.useFakeTimers();
 
@@ -189,12 +170,9 @@ describe('SplitwiseClient', () => {
   });
 
   it('sends no Authorization header to a non-Splitwise asset host', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: new Headers({ 'content-type': 'application/pdf' }),
-      arrayBuffer: async () => new ArrayBuffer(4),
-    });
+    const mockFetch = vi.fn().mockImplementation(
+      async () => new Response(new Uint8Array(4), { status: 200, headers: { 'content-type': 'application/pdf' } }),
+    );
     vi.stubGlobal('fetch', mockFetch);
 
     const client = new SplitwiseClient();
@@ -204,12 +182,28 @@ describe('SplitwiseClient', () => {
     expect(init.headers).not.toHaveProperty('Authorization');
   });
 
+  it('reports a timed-out write as outcome-unknown, not a plain timeout (mcp-utils 3)', async () => {
+    // A hung fetch that honours its abort signal, as a real one does.
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+        }),
+    ));
+    vi.useFakeTimers();
+    try {
+      const client = new SplitwiseClient();
+      const promise = client.request('POST', '/create_expense', { cost: '1.00' });
+      const assertion = expect(promise).rejects.toBeInstanceOf(WriteOutcomeUnknownError);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('sends POST body as JSON', async () => {
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      text: async () => JSON.stringify({ expense: {} }),
-    });
+    const mockFetch = vi.fn().mockImplementation(async () => jsonResponse({ expense: {} }));
     vi.stubGlobal('fetch', mockFetch);
 
     const client = new SplitwiseClient();
@@ -222,6 +216,63 @@ describe('SplitwiseClient', () => {
         body: JSON.stringify({ description: 'Dinner', cost: '50.00' }),
       })
     );
+  });
+});
+
+describe('SplitwiseClient response size caps (fleet-audit #733)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('refuses an API response whose Content-Length is over the client-wide cap, without reading it', async () => {
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>(
+      { pull(c) { pulled++; c.enqueue(new TextEncoder().encode('{}')); c.close(); } },
+      { highWaterMark: 0 },
+    );
+    const res = new Response(body, { status: 200, headers: { 'content-length': String(MAX_RESPONSE_BYTES + 1) } });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res));
+
+    const client = new SplitwiseClient();
+    await expect(client.request('GET', '/get_expenses')).rejects.toMatchObject({
+      kind: 'too_large',
+      maxBytes: MAX_RESPONSE_BYTES,
+    });
+    expect(pulled).toBe(0);
+  });
+
+  it('refuses a streamed body that grows past the cap', async () => {
+    const big = new Uint8Array(MAX_RESPONSE_BYTES + 1);
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(big, { status: 200 })));
+
+    const client = new SplitwiseClient();
+    await expect(client.request('GET', '/get_expenses')).rejects.toMatchObject({ kind: 'too_large' });
+  });
+
+  it('applies a per-call maxBytes to an asset download', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(
+      async () => new Response(new Uint8Array(2048), { status: 200, headers: { 'content-type': 'application/pdf' } }),
+    ));
+
+    const client = new SplitwiseClient();
+    await expect(
+      client.fetchAsset('https://splitwise.s3.amazonaws.com/uploads/receipt.pdf?sig=x', { maxBytes: 1024 }),
+    ).rejects.toMatchObject({ kind: 'too_large', maxBytes: 1024 });
+    // Under the cap, the same download succeeds.
+    await expect(
+      client.fetchAsset('https://splitwise.s3.amazonaws.com/uploads/receipt.pdf?sig=x', { maxBytes: 4096 }),
+    ).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('a too-large asset error does not leak the signed query', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(new Uint8Array(2048), { status: 200 })));
+
+    const client = new SplitwiseClient();
+    const err = await client
+      .fetchAsset('https://splitwise.s3.amazonaws.com/uploads/receipt.pdf?X-Amz-Signature=SECRETSIG', { maxBytes: 1024 })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).not.toContain('SECRETSIG');
   });
 });
 
@@ -276,7 +327,7 @@ describe('SplitwiseClient write-error bodies (HTTP 200 with errors)', () => {
   function stubBody(body: unknown) {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => JSON.stringify(body) }),
+      vi.fn().mockImplementation(async () => jsonResponse(body)),
     );
   }
 

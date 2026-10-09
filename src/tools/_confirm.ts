@@ -26,6 +26,13 @@ export interface WriteGate {
   target: string | number;
   /** The phase-2 token from the tool's input. */
   confirmToken?: string;
+  /**
+   * The tool's validated arguments, as the handler received them (`{}` for a
+   * tool with none). Both rails bind them: a token or prompt acceptance minted
+   * for one set of arguments is refused for any other. A `confirmToken` key is
+   * dropped by mcp-utils.
+   */
+  args: object;
 }
 
 /**
@@ -54,6 +61,10 @@ export function confirmWrite(ctx: ServerContext, gate: WriteGate) {
       details: preview,
       tool: gate.tool,
       confirmToken: gate.confirmToken,
+      // One API key per SplitwiseClient (the hosted path builds a client per
+      // user), so there is no account switch inside a server to bind.
+      account: undefined,
+      args: gate.args,
       subject: () => ({ target: String(gate.target), payload: request, preview }),
     }),
   );

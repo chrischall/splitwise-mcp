@@ -113,7 +113,7 @@ Add to Claude Desktop config:
 | Env var | Required | Notes |
 |---------|----------|-------|
 | `SPLITWISE_API_KEY` | Yes | API key from [splitwise.com/apps/register](https://secure.splitwise.com/apps/register) |
-| `SPLITWISE_OUTPUT_DIR` | No | Where `sw_get_receipt` writes downloaded receipts (owner-only, mode 0600). Defaults to a `splitwise-mcp` folder in the OS temp directory, never the working directory. When set, a per-call `output_dir` must be inside it. |
+| `SPLITWISE_OUTPUT_DIR` | No | Where `sw_get_receipt` writes downloaded receipts (owner-only, mode 0600). Defaults to `~/Downloads/splitwise-mcp`, never the working directory. When set, a per-call `output_dir` must be inside it. |
 
 ## Confirmations
 

@@ -15,11 +15,8 @@ let harness: Awaited<ReturnType<typeof createTestHarness>> | undefined;
 const savedKey = process.env.SPLITWISE_API_KEY;
 
 async function stubBody(body: unknown) {
-  const fetchMock = vi.fn().mockResolvedValue({
-    ok: true,
-    status: 200,
-    text: async () => JSON.stringify(body),
-  });
+  // A real Response: mcp-utils 3 streams `res.body` under a size cap.
+  const fetchMock = vi.fn().mockImplementation(async () => new Response(JSON.stringify(body), { status: 200 }));
   vi.stubGlobal('fetch', fetchMock);
   const client = new SplitwiseClient();
   harness = await createTestHarness((server) => registerExpenseTools(server, client));

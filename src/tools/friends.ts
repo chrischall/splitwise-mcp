@@ -35,7 +35,8 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ user_email, user_first_name, user_last_name, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { user_email, user_first_name, user_last_name, confirmToken } = args;
       const body = pruneUndefined({ user_email, user_first_name, user_last_name });
       const gate = await confirmWrite(ctx, {
         tool: 'sw_create_friend',
@@ -46,6 +47,7 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
         body,
         target: user_email,
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', '/create_friend', body);
@@ -64,7 +66,8 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
         confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id, confirmToken }, ctx) => {
+    async (args, ctx) => {
+      const { id, confirmToken } = args;
       const gate = await confirmWrite(ctx, {
         tool: 'sw_delete_friend',
         action: 'friend.delete',
@@ -73,6 +76,7 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
         path: `/delete_friend/${id}`,
         target: id,
         confirmToken,
+        args,
       });
       if (gate) return gate;
       const data = await client.request('POST', `/delete_friend/${id}`);
