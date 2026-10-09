@@ -4,6 +4,7 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { buildQueryString, minifiedResult, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
+import { UNTRUSTED_DESCRIPTION_SUFFIX, swUntrustedResult } from './_untrusted.js';
 
 interface UserShare {
   user_id: number;
@@ -64,7 +65,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_list_expenses',
     {
       description:
-        'List or search Splitwise expenses. All filters are optional. Use group_id to filter by group, dated_after/dated_before for date ranges.',
+        `List or search Splitwise expenses. All filters are optional. Use group_id to filter by group, dated_after/dated_before for date ranges. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
@@ -106,14 +107,14 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         offset: args.offset,
       });
       const data = await client.request('GET', `/get_expenses${qs}`);
-      return minifiedResult(viewExpenses(resolveView(args.view, SW_VIEWS), data));
+      return swUntrustedResult(viewExpenses(resolveView(args.view, SW_VIEWS), data));
     },
   );
 
   server.registerTool(
     'sw_get_expense',
     {
-      description: 'Get full details of a single Splitwise expense by id.',
+      description: `Get full details of a single Splitwise expense by id. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
@@ -124,7 +125,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     },
     async ({ id, view }) => {
       const data = await client.request('GET', `/get_expense/${id}`);
-      return minifiedResult(viewExpense(resolveView(view, SW_VIEWS), data));
+      return swUntrustedResult(viewExpense(resolveView(view, SW_VIEWS), data));
     },
   );
 

@@ -813,3 +813,36 @@ describe('sw_get_receipt file-write defaults', () => {
     await harness.close();
   });
 });
+
+// fleet-audit #737: a receipt's text layer is whatever the uploader put in the
+// PDF, so it is fenced as untrusted like comments and descriptions.
+describe('sw_get_receipt untrusted text', () => {
+  it('fences extracted PDF text as untrusted, markers first', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(TEXT_PDF, 'application/pdf'));
+    const harness = await harnessWith(fetchMock);
+
+    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, extract_text: true });
+    const raw = errorText(result);
+    expect(raw.startsWith('{"untrusted_content":true,"note":')).toBe(true);
+    expect(parseToolResult<{ text: string }>(result).text).toContain('Total 129.00 USD');
+
+    const { tools } = await harness.client.listTools();
+    expect(tools.find((t) => t.name === 'sw_get_receipt')!.description).toContain('untrusted');
+
+    await harness.close();
+  });
+
+  it('leaves a result with no extracted text unfenced', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(JPEG, 'image/jpeg'));
+    const harness = await harnessWith(fetchMock);
+
+    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    expect(errorText(result).startsWith('{"expense_id"')).toBe(true);
+
+    await harness.close();
+  });
+});

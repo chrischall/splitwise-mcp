@@ -11,6 +11,7 @@ import {
   sniffMimeBytes,
 } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
+import { UNTRUSTED_DESCRIPTION_SUFFIX, swUntrustedEnvelope } from './_untrusted.js';
 
 /** Splitwise's receipt object on an expense — either rendition can be null. */
 interface ExpenseReceipt {
@@ -121,7 +122,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
     'sw_get_receipt',
     {
       description:
-        "Download the receipt image or PDF attached to a Splitwise expense. The receipt URLs returned by sw_get_expense need the server's credentials — fetching them directly returns 401 — so use this tool instead. Set inline:true to get the bytes back in the result (images AND PDFs), or extract_text:true to get a PDF's text without the binary at all — both work when the caller can't see this server's filesystem. Without either, it writes the file (to $SPLITWISE_OUTPUT_DIR, else the OS temp directory) and returns the path; with either, it writes only when output_dir or write:true asks for it.",
+        "Download the receipt image or PDF attached to a Splitwise expense. The receipt URLs returned by sw_get_expense need the server's credentials — fetching them directly returns 401 — so use this tool instead. Set inline:true to get the bytes back in the result (images AND PDFs), or extract_text:true to get a PDF's text without the binary at all — both work when the caller can't see this server's filesystem. Without either, it writes the file (to $SPLITWISE_OUTPUT_DIR, else the OS temp directory) and returns the path; with either, it writes only when output_dir or write:true asks for it. Extracted text: " + UNTRUSTED_DESCRIPTION_SUFFIX,
       // Not read-only: this writes a file into a caller-supplied directory, and
       // `readOnlyHint` is what a host reads when deciding to skip its approval
       // prompt. Not destructive either — `uniquePath` always picks a filename
@@ -292,7 +293,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
         );
       }
 
-      const result = minifiedResult({
+      const payload = {
         expense_id: id,
         size: served,
         ...(served !== wanted
@@ -321,7 +322,9 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
           : {}),
         ...(text !== undefined ? { text } : {}),
         ...(textNote !== undefined ? { text_note: textNote } : {}),
-      });
+      };
+      // The text layer is whatever the uploader put in the PDF — fence it.
+      const result = minifiedResult(text !== undefined ? swUntrustedEnvelope(payload) : payload);
 
       if (inlined) {
         const type = mimeType ?? 'application/octet-stream';
