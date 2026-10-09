@@ -113,7 +113,7 @@ Add to Claude Desktop config:
 | Env var | Required | Notes |
 |---------|----------|-------|
 | `SPLITWISE_API_KEY` | Yes | API key from [splitwise.com/apps/register](https://secure.splitwise.com/apps/register) |
-| `SPLITWISE_OUTPUT_DIR` | No | Where `sw_get_receipt` writes downloaded receipts. Defaults to the current working directory. When set, a per-call `output_dir` must be inside it. |
+| `SPLITWISE_OUTPUT_DIR` | No | Where `sw_get_receipt` writes downloaded receipts (owner-only, mode 0600). Defaults to a `splitwise-mcp` folder in the OS temp directory, never the working directory. When set, a per-call `output_dir` must be inside it. |
 
 ## Confirmations
 
@@ -193,7 +193,7 @@ Every Splitwise write (creating, editing or deleting expenses, groups, friends, 
 
 **401 when opening a receipt URL** -- the `receipt.original` / `receipt.large` URLs on an expense are not public; they need the API key. Use `sw_get_receipt` instead of fetching them directly.
 
-**Receipt lands somewhere you can't read it** -- `sw_get_receipt` writes to the *server's* filesystem, which is not the caller's when the server is hosted or containerised. Pass `inline: true` for the bytes (an image block for images, an embedded resource for PDFs) or `extract_text: true` for a PDF's text. Pass `write: false` to skip the write; if it fails on its own (read-only filesystem), the call still succeeds and reports `write_error` as long as you asked for content.
+**Receipt lands somewhere you can't read it** -- `sw_get_receipt` writes to the *server's* filesystem, which is not the caller's when the server is hosted or containerised. Pass `inline: true` for the bytes (an image block for images, an embedded resource for PDFs) or `extract_text: true` for a PDF's text. With `inline` or `extract_text` and no `output_dir`, nothing is written unless you also pass `write: true`. Pass `write: false` to skip the write in any case; if it fails on its own (read-only filesystem), the call still succeeds and reports `write_error` as long as you asked for content.
 
 **429 rate limit** -- Splitwise has undocumented rate limits. Wait a moment and retry.
 

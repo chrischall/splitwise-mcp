@@ -51,7 +51,7 @@ Each tool file exports a `register<Domain>Tools(server, client)` function that c
 
 ```
 SPLITWISE_API_KEY=<your key>   # Required. From https://secure.splitwise.com/apps/register
-SPLITWISE_OUTPUT_DIR=<path>    # Optional. Where sw_get_receipt writes files (default: cwd)
+SPLITWISE_OUTPUT_DIR=<path>    # Optional. Where sw_get_receipt writes files (default: $TMPDIR/splitwise-mcp, mode 0600)
 ```
 
 Loaded via `loadDotenvSafely` (from `@chrischall/mcp-utils`) from `.env` next to `dist/`, with `override: false` so a host-provided value always wins; a missing `dotenv` module is swallowed (mcpb bundles externalize it — see `bundle` script's `--external:dotenv` — and the host provides env). `readEnvVar` (also from `@chrischall/mcp-utils`) treats blank, `"undefined"`, `"null"`, and unsubstituted `${FOO}` placeholders as unset.

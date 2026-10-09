@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { CallToolResult } from '@modelcontextprotocol/server';
@@ -741,6 +741,74 @@ describe('sw_get_receipt output_dir confinement', () => {
     expect(result.isError).toBeFalsy();
     expect(body.write_error).toBeUndefined();
     expect(readdirSync(target)).toEqual(['splitwise-receipt-4644814211.jpg']);
+
+    await harness.close();
+  });
+});
+
+// fleet-audit #738: a receipt is financial PII. It must not land in the
+// working tree (usually a git repo under Claude Code) by default, must not be
+// written at all when the caller only asked for content, and must not be
+// world-readable.
+describe('sw_get_receipt file-write defaults', () => {
+  function fetchJpeg() {
+    return vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: API_RECEIPT_URL }))
+      .mockResolvedValueOnce(binaryResponse(JPEG, 'image/jpeg'));
+  }
+
+  it.each([{ inline: true }, { extract_text: true }])(
+    'writes no file when only content was asked for (%o)',
+    async (args) => {
+      process.env.SPLITWISE_OUTPUT_DIR = outputDir;
+      const harness = await harnessWith(fetchJpeg());
+
+      const result = await harness.callTool('sw_get_receipt', { id: 4644814211, ...args });
+      // extract_text on a JPEG yields only a text_note, and with nothing else
+      // returned the tool refuses — either way, nothing may be on disk.
+      if (result.isError) expect(errorText(result)).toContain('only content was requested');
+      else expect(parseToolResult<{ path?: string }>(result).path).toBeUndefined();
+      expect(readdirSync(outputDir)).toEqual([]);
+
+      await harness.close();
+    },
+  );
+
+  it('still writes when content was asked for AND write:true', async () => {
+    process.env.SPLITWISE_OUTPUT_DIR = outputDir;
+    const harness = await harnessWith(fetchJpeg());
+
+    const body = parseToolResult<{ path: string }>(
+      await harness.callTool('sw_get_receipt', { id: 4644814211, inline: true, write: true }),
+    );
+    expect(readdirSync(outputDir)).toEqual([basename(body.path)]);
+
+    await harness.close();
+  });
+
+  it('defaults to a directory under the OS temp dir, not the working directory', async () => {
+    const harness = await harnessWith(fetchJpeg());
+
+    const body = parseToolResult<{ path: string }>(
+      await harness.callTool('sw_get_receipt', { id: 4644814211 }),
+    );
+    try {
+      expect(body.path.startsWith(join(tmpdir(), 'splitwise-mcp'))).toBe(true);
+      expect(body.path.startsWith(process.cwd())).toBe(false);
+    } finally {
+      rmSync(body.path, { force: true });
+    }
+
+    await harness.close();
+  });
+
+  it('writes the receipt owner-only (0600)', async () => {
+    const harness = await harnessWith(fetchJpeg());
+
+    const body = parseToolResult<{ path: string }>(
+      await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir }),
+    );
+    expect(statSync(body.path).mode & 0o777).toBe(0o600);
 
     await harness.close();
   });

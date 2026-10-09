@@ -25,7 +25,7 @@
         },
         {
           "name": "SPLITWISE_OUTPUT_DIR",
-          "description": "Directory sw_get_receipt writes downloaded receipts into (default: the working directory)",
+          "description": "Directory sw_get_receipt writes downloaded receipts into (default: a splitwise-mcp folder in the OS temp directory)",
           "isRequired": false,
           "format": "string",
           "isSecret": false

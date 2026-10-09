@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { z } from 'zod';
 import type { McpServer, CallToolResult } from '@modelcontextprotocol/server';
 import {
@@ -25,6 +27,17 @@ const MAX_INLINE_BYTES = 4 * 1024 * 1024;
 const MAX_TEXT_CHARS = 100_000;
 
 const PDF_MIME = 'application/pdf';
+
+/**
+ * Where a receipt goes when neither output_dir nor SPLITWISE_OUTPUT_DIR names
+ * a place. Not the working directory: under Claude Code that is usually the
+ * user's git repo, where a receipt (financial PII) can be committed and pushed
+ * by accident (fleet-audit #738).
+ */
+const DEFAULT_OUTPUT_DIR = join(tmpdir(), 'splitwise-mcp');
+
+/** Receipts are written owner-only — they carry financial details. */
+const RECEIPT_FILE_MODE = 0o600;
 
 /** Content types that carry no information about the actual format. */
 const GENERIC_TYPES = new Set(['application/octet-stream', 'binary/octet-stream']);
@@ -108,7 +121,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
     'sw_get_receipt',
     {
       description:
-        "Download the receipt image or PDF attached to a Splitwise expense. The receipt URLs returned by sw_get_expense need the server's credentials — fetching them directly returns 401 — so use this tool instead. Set inline:true to get the bytes back in the result (images AND PDFs), or extract_text:true to get a PDF's text without the binary at all — both work when the caller can't see this server's filesystem. It also writes the file and returns the path, unless write:false or the filesystem is read-only.",
+        "Download the receipt image or PDF attached to a Splitwise expense. The receipt URLs returned by sw_get_expense need the server's credentials — fetching them directly returns 401 — so use this tool instead. Set inline:true to get the bytes back in the result (images AND PDFs), or extract_text:true to get a PDF's text without the binary at all — both work when the caller can't see this server's filesystem. Without either, it writes the file (to $SPLITWISE_OUTPUT_DIR, else the OS temp directory) and returns the path; with either, it writes only when output_dir or write:true asks for it.",
       // Not read-only: this writes a file into a caller-supplied directory, and
       // `readOnlyHint` is what a host reads when deciding to skip its approval
       // prompt. Not destructive either — `uniquePath` always picks a filename
@@ -137,13 +150,13 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
         output_dir: z
           .string()
           .describe(
-            'Directory to write the receipt into. Defaults to $SPLITWISE_OUTPUT_DIR, else the current working directory. When SPLITWISE_OUTPUT_DIR is set, this must be inside it.',
+            'Directory to write the receipt into. Defaults to $SPLITWISE_OUTPUT_DIR, else a splitwise-mcp folder in the OS temp directory. When SPLITWISE_OUTPUT_DIR is set, this must be inside it.',
           )
           .optional(),
         write: z
           .boolean()
           .describe(
-            "Write the receipt to disk. Defaults to true. Pass false when the caller cannot reach this server's filesystem, or when the server runs read-only.",
+            "Write the receipt to disk (owner-only). Defaults to true, except when inline or extract_text is requested without an output_dir — then the content is returned and nothing is written. Pass false when the caller cannot reach this server's filesystem, or when the server runs read-only.",
           )
           .optional(),
       }),
@@ -174,9 +187,14 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
       // filesystem, and failing the whole call there would strand a caller who
       // only wanted the content. Report it and carry on — unless nothing else
       // was requested, in which case there is no result to return (below).
+      // A caller who asked only for content (inline / extract_text) gets no
+      // file unless it named a directory or said write:true — a receipt left
+      // on disk that nobody asked for is a PII leak, not a convenience.
+      const contentOnly = (inline === true || extract_text === true) && output_dir === undefined;
+      const shouldWrite = write ?? !contentOnly;
       let path: string | undefined;
       let writeError: string | undefined;
-      if (write !== false) {
+      if (shouldWrite) {
         try {
           // output_dir is model-chosen: once the operator configures
           // SPLITWISE_OUTPUT_DIR, a per-call directory must stay inside it
@@ -184,12 +202,13 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
           // old, unconfined behaviour.
           const configuredDir = readEnvVar('SPLITWISE_OUTPUT_DIR');
           path = writeBinaryOutput({
-            dir: resolveOutputDir(output_dir, 'SPLITWISE_OUTPUT_DIR', {
+            dir: resolveOutputDir(output_dir ?? (configuredDir ? undefined : DEFAULT_OUTPUT_DIR), 'SPLITWISE_OUTPUT_DIR', {
               ...(configuredDir ? { allowedRoots: [configuredDir] } : {}),
             }),
             baseName: `splitwise-receipt-${id}`,
             base64,
             extension: extensionFor(mimeType, url),
+            mode: RECEIPT_FILE_MODE,
           });
         } catch (err) {
           writeError = describeError(err);
@@ -241,7 +260,9 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
       if (path === undefined && !inlined && text === undefined) {
         const reason = writeError
           ? `could not be written (${writeError})`
-          : 'was not written (write:false)';
+          : write === false
+            ? 'was not written (write:false)'
+            : 'was not written (only content was requested; pass write:true or output_dir for a file)';
         // Name every blocker — more than one can apply at once — then offer only
         // the routes still open. A flag the caller already passed is not a
         // suggestion; when `inline` was requested it can only have been rejected
