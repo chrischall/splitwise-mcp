@@ -43,7 +43,7 @@ src/
     _confirm.ts   # confirmWrite(): the confirmation gate every write goes through
 ```
 
-Every write except the two undeletes is gated by `confirmWrite(ctx, …)` from `src/tools/_confirm.ts` (Splitwise writes notify other people). A client that can show a prompt is asked (unless `MCP_CONFIRM_ELICITATION=off`); one that cannot gets the two-step token flow (`MCP_CONFIRM_MODE`): the first call does nothing and returns a preview (`action`, `method`, `path`, `willSend`) plus a `confirmToken` bound to exactly that request, and only a repeat call with the token writes. Validation (e.g. `split_equally` vs `users`) runs BEFORE the gate, so a bad request is refused on the first call. A new write tool takes `confirmToken: confirmTokenParam`, ends its description with `CONFIRM_NOTE`, and calls `confirmWrite` before the request.
+Every write (the two undeletes included — a restore puts charges back on other people's balances) is gated by `confirmWrite(ctx, …)` from `src/tools/_confirm.ts` (Splitwise writes notify other people). A client that can show a prompt is asked (unless `MCP_CONFIRM_ELICITATION=off`); one that cannot gets the two-step token flow (`MCP_CONFIRM_MODE`): the first call does nothing and returns a preview (`action`, `method`, `path`, `willSend`) plus a `confirmToken` bound to exactly that request, and only a repeat call with the token writes. Validation (e.g. `split_equally` vs `users`) runs BEFORE the gate, so a bad request is refused on the first call. A new write tool takes `confirmToken: confirmTokenParam`, ends its description with `CONFIRM_NOTE`, and calls `confirmWrite` before the request.
 
 Each tool file exports a `register<Domain>Tools(server, client)` function that calls `server.registerTool(name, { description, annotations, inputSchema }, handler)` (high-level `McpServer` API with zod schemas). The `SplitwiseClient` is INJECTED as the second argument rather than imported as a module singleton — a hosted per-user deployment builds one client per authenticated user, which a singleton cannot express. `index.ts` passes the register functions to `runMcp`, which builds the `McpServer`, calls each, and connects the stdio transport.
 
@@ -51,7 +51,7 @@ Each tool file exports a `register<Domain>Tools(server, client)` function that c
 
 ```
 SPLITWISE_API_KEY=<your key>   # Required. From https://secure.splitwise.com/apps/register
-SPLITWISE_OUTPUT_DIR=<path>    # Optional. Where sw_get_receipt writes files (default: cwd)
+SPLITWISE_OUTPUT_DIR=<path>    # Optional. Where sw_get_receipt writes files (default: $TMPDIR/splitwise-mcp, mode 0600)
 ```
 
 Loaded via `loadDotenvSafely` (from `@chrischall/mcp-utils`) from `.env` next to `dist/`, with `override: false` so a host-provided value always wins; a missing `dotenv` module is swallowed (mcpb bundles externalize it — see `bundle` script's `--external:dotenv` — and the host provides env). `readEnvVar` (also from `@chrischall/mcp-utils`) treats blank, `"undefined"`, `"null"`, and unsubstituted `${FOO}` placeholders as unset.

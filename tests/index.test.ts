@@ -63,4 +63,41 @@ describe('tool registry', () => {
     };
     expect(manifest.tools.map((t) => t.name).sort()).toEqual([...registered].sort());
   });
+
+  // Every tool states its hints explicitly (hosts read them to decide whether
+  // to prompt). Writes are readOnlyHint:false; destructiveHint is true only
+  // when the write removes or overwrites something, false when it only adds
+  // or restores (fleet-audit #736).
+  const writes: Record<string, boolean> = {
+    sw_update_user: true,
+    sw_create_group: false,
+    sw_add_user_to_group: false,
+    sw_remove_user_from_group: true,
+    sw_delete_group: true,
+    sw_undelete_group: false,
+    sw_create_friend: false,
+    sw_delete_friend: true,
+    sw_create_expense: false,
+    sw_update_expense: true,
+    sw_delete_expense: true,
+    sw_undelete_expense: false,
+    sw_get_receipt: false,
+    sw_create_comment: false,
+    sw_delete_comment: true,
+  };
+
+  it('annotates every tool with explicit, consistent hints', async () => {
+    const { tools } = await harness.client.listTools();
+    for (const tool of tools) {
+      const destructive = writes[tool.name];
+      const want =
+        destructive === undefined
+          ? { readOnlyHint: true }
+          : { readOnlyHint: false, destructiveHint: destructive };
+      expect({ name: tool.name, annotations: tool.annotations }).toMatchObject({
+        name: tool.name,
+        annotations: want,
+      });
+    }
+  });
 });

@@ -46,7 +46,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     'sw_create_group',
     {
       description: `Create a new Splitwise group. ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: z.object({
         name: z.string().describe('Group name'),
         group_type: z
@@ -83,6 +83,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     {
       description:
         `Add a user to a Splitwise group. Provide user_id (preferred, use sw_list_friends to resolve a name) or first_name + last_name + email to invite by email. ${CONFIRM_NOTE}`,
+      annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: z.object({
         group_id: z.number().describe('Group ID'),
         user_id: z.number().describe('User ID (preferred)').optional(),
@@ -125,7 +126,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     {
       description:
         `Remove a user from a Splitwise group. ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: z.object({
         group_id: z.number().describe('Group ID'),
         user_id: z.number().describe('User ID to remove'),
@@ -154,7 +155,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     {
       description:
         `Soft-delete a Splitwise group. ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: z.object({
         id: z.number().describe('Group ID to delete'),
         confirmToken: confirmTokenParam,
@@ -179,12 +180,27 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
   server.registerTool(
     'sw_undelete_group',
     {
-      description: 'Restore a soft-deleted Splitwise group.',
+      description:
+        `Restore a soft-deleted Splitwise group. This puts its charges back on every participant's balance and notifies them, so it is gated like the other writes. ${CONFIRM_NOTE}`,
+      // Not read-only (it changes balances), but additive rather than
+      // destructive: it brings back a record, and the delete tool undoes it.
+      annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: z.object({
         id: z.number().describe('Group ID to restore'),
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id }) => {
+    async ({ id, confirmToken }, ctx) => {
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_undelete_group',
+        action: 'group.undelete',
+        summary: `Restore soft-deleted Splitwise group ${id} — puts it back on balances and notifies its members`,
+        method: 'POST',
+        path: `/undelete_group/${id}`,
+        target: id,
+        confirmToken,
+      });
+      if (gate) return gate;
       const data = await client.request('POST', `/undelete_group/${id}`);
       return minifiedResult(data);
     },

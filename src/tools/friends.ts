@@ -27,7 +27,7 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
     {
       description:
         `Add a Splitwise friend by email (sends them an invite). ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: z.object({
         user_email: z.string().describe('Email of the user to add as a friend'),
         user_first_name: z.string().describe('First name of the user').optional(),
@@ -58,7 +58,7 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
     {
       description:
         `Remove a Splitwise friendship by user id. ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: z.object({
         id: z.number().describe('User ID of the friend to remove'),
         confirmToken: confirmTokenParam,

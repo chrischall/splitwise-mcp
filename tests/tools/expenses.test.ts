@@ -57,6 +57,27 @@ describe('sw_list_expenses', () => {
     await harness.callTool('sw_list_expenses', { group_id: 5, limit: 10 });
     expect(mockRequest).toHaveBeenCalledWith('GET', '/get_expenses?group_id=5&limit=10');
   });
+
+  // Splitwise treats limit=0 as "return everything" — an unbounded result the
+  // host refuses — so limit is 1..200 and offset a non-negative integer.
+  it.each([
+    { limit: 0 },
+    { limit: 201 },
+    { limit: 2.5 },
+    { limit: -1 },
+    { offset: -1 },
+    { offset: 1.5 },
+  ])('rejects out-of-range pagination %o without calling Splitwise', async (args) => {
+    const result = await harness.callTool('sw_list_expenses', args);
+    expect(result.isError).toBe(true);
+    expect(mockRequest).not.toHaveBeenCalled();
+  });
+
+  it('accepts the bounds limit:200, offset:0', async () => {
+    mockRequest.mockResolvedValue({ expenses: [] });
+    await harness.callTool('sw_list_expenses', { limit: 200, offset: 0 });
+    expect(mockRequest).toHaveBeenCalledWith('GET', '/get_expenses?limit=200&offset=0');
+  });
 });
 
 describe('sw_get_expense', () => {
@@ -172,11 +193,18 @@ describe('sw_delete_expense', () => {
 });
 
 describe('sw_undelete_expense', () => {
-  it('calls POST /undelete_expense/42', async () => {
+  it('is confirm-gated: previews first, then calls POST /undelete_expense/42 with the token', async () => {
     mockRequest.mockResolvedValue({ success: true });
-    const result = await harness.callTool('sw_undelete_expense', { id: 42 });
+    const { phase1, result } = await confirmedCall(harness, mockRequest, 'sw_undelete_expense', { id: 42 });
+    expect(phase1.preview).toMatchObject({ method: 'POST', path: '/undelete_expense/42' });
     expect(mockRequest).toHaveBeenCalledWith('POST', '/undelete_expense/42');
     expect(result.isError).toBeFalsy();
+  });
+
+  it('is annotated as a non-read-only, non-destructive (additive) write', async () => {
+    const tool = (await harness.client.listTools()).tools.find((t) => t.name === 'sw_undelete_expense');
+    expect(tool!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    expect(tool!.description).toContain('confirmToken');
   });
 });
 

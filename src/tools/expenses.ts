@@ -4,6 +4,7 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { buildQueryString, minifiedResult, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
+import { UNTRUSTED_DESCRIPTION_SUFFIX, swUntrustedResult } from './_untrusted.js';
 
 interface UserShare {
   user_id: number;
@@ -64,7 +65,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_list_expenses',
     {
       description:
-        'List or search Splitwise expenses. All filters are optional. Use group_id to filter by group, dated_after/dated_before for date ranges.',
+        `List or search Splitwise expenses. All filters are optional. Use group_id to filter by group, dated_after/dated_before for date ranges. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
@@ -82,8 +83,16 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
           .optional(),
         updated_after: z.string().describe('ISO 8601 datetime').optional(),
         updated_before: z.string().describe('ISO 8601 datetime').optional(),
-        limit: z.number().describe('Max results (API default: 20)').optional(),
-        offset: z.number().describe('Pagination offset').optional(),
+        // Bounded: Splitwise reads limit=0 as "return everything", an
+        // unbounded result the host refuses.
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(200)
+          .describe('Max results, 1-200 (API default: 20). Page with offset for more.')
+          .optional(),
+        offset: z.number().int().min(0).describe('Pagination offset').optional(),
       }),
     },
     async (args) => {
@@ -98,14 +107,14 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         offset: args.offset,
       });
       const data = await client.request('GET', `/get_expenses${qs}`);
-      return minifiedResult(viewExpenses(resolveView(args.view, SW_VIEWS), data));
+      return swUntrustedResult(viewExpenses(resolveView(args.view, SW_VIEWS), data));
     },
   );
 
   server.registerTool(
     'sw_get_expense',
     {
-      description: 'Get full details of a single Splitwise expense by id.',
+      description: `Get full details of a single Splitwise expense by id. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
       annotations: { readOnlyHint: true },
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
@@ -116,7 +125,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     },
     async ({ id, view }) => {
       const data = await client.request('GET', `/get_expense/${id}`);
-      return minifiedResult(viewExpense(resolveView(view, SW_VIEWS), data));
+      return swUntrustedResult(viewExpense(resolveView(view, SW_VIEWS), data));
     },
   );
 
@@ -125,6 +134,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. ${CONFIRM_NOTE}`,
+      annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: z.object({
         group_id: z.number().describe('Group to add expense to (use 0 for no group)'),
         description: z.string().describe('Short description of the expense'),
@@ -172,6 +182,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split). ${CONFIRM_NOTE}`,
+      annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: z.object({
         expense_id: z.number().describe('ID of the expense to update'),
         description: z.string().optional(),
@@ -214,7 +225,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore. ${CONFIRM_NOTE}`,
-      annotations: { destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true },
       inputSchema: z.object({
         id: z.number().describe('Expense ID to delete'),
         confirmToken: confirmTokenParam,
@@ -239,12 +250,27 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
   server.registerTool(
     'sw_undelete_expense',
     {
-      description: 'Restore a soft-deleted Splitwise expense.',
+      description:
+        `Restore a soft-deleted Splitwise expense. This puts its charges back on every participant's balance and notifies them, so it is gated like the other writes. ${CONFIRM_NOTE}`,
+      // Not read-only (it changes balances), but additive rather than
+      // destructive: it brings back a record, and the delete tool undoes it.
+      annotations: { readOnlyHint: false, destructiveHint: false },
       inputSchema: z.object({
         id: z.number().describe('Expense ID to restore'),
+        confirmToken: confirmTokenParam,
       }),
     },
-    async ({ id }) => {
+    async ({ id, confirmToken }, ctx) => {
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_undelete_expense',
+        action: 'expense.undelete',
+        summary: `Restore soft-deleted Splitwise expense ${id} — puts it back on balances and notifies its participants`,
+        method: 'POST',
+        path: `/undelete_expense/${id}`,
+        target: id,
+        confirmToken,
+      });
+      if (gate) return gate;
       const data = await client.request('POST', `/undelete_expense/${id}`);
       return minifiedResult(data);
     },
