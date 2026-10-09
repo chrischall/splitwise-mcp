@@ -11,7 +11,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     'sw_get_notifications',
     {
       description: `Get recent Splitwise activity notifications for the current user. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: true },
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
           note: 'compact drops the avatar URLs; "full" returns Splitwise\'s whole record.',
@@ -29,7 +29,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         'Get the hierarchical list of Splitwise expense categories. Use the returned id as category_id when creating expenses.',
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async () => {
       const data = await client.request('GET', '/get_categories');
@@ -42,7 +42,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         'Get all Splitwise-supported currency codes and units. Use the currency_code value when creating expenses in non-default currencies.',
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async () => {
       const data = await client.request('GET', '/get_currencies');
@@ -54,7 +54,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     'sw_get_comments',
     {
       description: `Get all comments on a Splitwise expense. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: true },
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
           note: 'compact drops the avatar URLs; "full" returns Splitwise\'s whole record.',
@@ -75,7 +75,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Add a comment to a Splitwise expense (visible to other participants). ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         expense_id: z.number().describe('Expense ID to comment on'),
         content: z.string().describe('Comment text'),
@@ -106,7 +106,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     {
       description:
         `Delete a comment by id. ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         id: z.number().describe('Comment ID to delete'),
         confirmToken: confirmTokenParam,

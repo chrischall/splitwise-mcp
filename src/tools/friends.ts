@@ -11,7 +11,7 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
     {
       description:
         "List all Splitwise friends. Use this to resolve a friend's name to a user_id before adding them to a group or building a custom expense split. The compact default returns id, name (first_name + last_name joined), email, registration_status and any non-empty balance per friend; pass view:'full' for Splitwise's raw records, which keep first_name and last_name separate.",
-      annotations: { readOnlyHint: true },
+      annotations: { readOnlyHint: true, openWorldHint: true },
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, { note: PERSON_VIEW_NOTE }),
       }),
@@ -27,7 +27,7 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
     {
       description:
         `Add a Splitwise friend by email (sends them an invite). ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         user_email: z.string().describe('Email of the user to add as a friend'),
         user_first_name: z.string().describe('First name of the user').optional(),
@@ -60,7 +60,7 @@ export function registerFriendTools(server: McpServer, client: SplitwiseClient):
     {
       description:
         `Remove a Splitwise friendship by user id. ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         id: z.number().describe('User ID of the friend to remove'),
         confirmToken: confirmTokenParam,

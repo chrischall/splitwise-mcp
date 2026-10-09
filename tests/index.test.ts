@@ -65,24 +65,27 @@ describe('tool registry', () => {
   });
 
   // Every tool states its hints explicitly (hosts read them to decide whether
-  // to prompt). Writes are readOnlyHint:false; destructiveHint is true only
-  // when the write removes or overwrites something, false when it only adds
-  // or restores (fleet-audit #736).
+  // to prompt). Writes are readOnlyHint:false. destructiveHint follows the
+  // fleet's inverse test: false only when a later call in this tool set
+  // restores the prior state AND nothing reached another person; anything
+  // that invites, notifies or posts to someone else is destructive even when
+  // it looks reversible (an undelete cannot un-send its notification).
+  // Every tool talks to the Splitwise API, so openWorldHint is true throughout.
   const writes: Record<string, boolean> = {
     sw_update_user: true,
     sw_create_group: false,
-    sw_add_user_to_group: false,
+    sw_add_user_to_group: true,
     sw_remove_user_from_group: true,
     sw_delete_group: true,
-    sw_undelete_group: false,
-    sw_create_friend: false,
+    sw_undelete_group: true,
+    sw_create_friend: true,
     sw_delete_friend: true,
-    sw_create_expense: false,
+    sw_create_expense: true,
     sw_update_expense: true,
     sw_delete_expense: true,
-    sw_undelete_expense: false,
+    sw_undelete_expense: true,
     sw_get_receipt: false,
-    sw_create_comment: false,
+    sw_create_comment: true,
     sw_delete_comment: true,
   };
 
@@ -92,8 +95,8 @@ describe('tool registry', () => {
       const destructive = writes[tool.name];
       const want =
         destructive === undefined
-          ? { readOnlyHint: true }
-          : { readOnlyHint: false, destructiveHint: destructive };
+          ? { readOnlyHint: true, openWorldHint: true }
+          : { readOnlyHint: false, destructiveHint: destructive, openWorldHint: true };
       expect({ name: tool.name, annotations: tool.annotations }).toMatchObject({
         name: tool.name,
         annotations: want,

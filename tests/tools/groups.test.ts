@@ -130,9 +130,9 @@ describe('group tools', () => {
       expect(result.isError).toBeFalsy();
     });
 
-    it('is annotated as a non-read-only, non-destructive (additive) write', async () => {
+    it('is annotated destructive: the restore notifies every participant, which no later call can undo', async () => {
       const tool = (await harness.client.listTools()).tools.find((t) => t.name === 'sw_undelete_group');
-      expect(tool!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+      expect(tool!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true, openWorldHint: true });
       expect(tool!.description).toContain('confirmToken');
     });
   });

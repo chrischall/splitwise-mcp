@@ -2,7 +2,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import {
   loadDotenvSafely,
-  readEnvVar,
+  requireEnvVar,
   createApiClient,
   ApiError,
   type ApiClient,
@@ -106,6 +106,21 @@ function assertWriteSucceeded(data: unknown): void {
   throw new Error(`Splitwise rejected the request: ${detail}`);
 }
 
+/**
+ * SPLITWISE_API_KEY is required on the stdio path — no tool works without it —
+ * so it is read with requireEnvVar (which applies readEnvVar's blank /
+ * `undefined` / `null` / `${...}` placeholder handling). The throw is swallowed
+ * here only so the constructor can defer it to the first tool call, keeping the
+ * install-time tools/list probe working on a server that has no key yet.
+ */
+function envApiKey(): string | undefined {
+  try {
+    return requireEnvVar('SPLITWISE_API_KEY');
+  } catch {
+    return undefined;
+  }
+}
+
 export class SplitwiseClient {
   private readonly apiKey: string | null;
   /** Which source supplied the API key — a LABEL, never the value. */
@@ -127,11 +142,11 @@ export class SplitwiseClient {
    */
   constructor(opts?: { apiKey?: string }) {
     // Injected apiKey (hosted per-user path) takes precedence; otherwise fall
-    // back to the env var. readEnvVar trims whitespace and treats
+    // back to the env var. envApiKey trims whitespace and treats
     // blank/`undefined`/`null`/`${...}` placeholder values as unset — defends
     // against MCP hosts that pass .mcp.json env blocks through unexpanded.
     const injected = opts?.apiKey;
-    const key = injected ?? readEnvVar('SPLITWISE_API_KEY');
+    const key = injected ?? envApiKey();
     // Which source supplied it, for `sw_healthcheck`. Derived from the SAME
     // `key` and `injected` bindings the resolution above uses, so the two
     // cannot disagree. An earlier version re-tested `opts?.apiKey` for
