@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.3.1](https://github.com/chrischall/splitwise-mcp/compare/v3.3.0...v3.3.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* annotate tools truthfully and sync manifests with the served tools ([#239](https://github.com/chrischall/splitwise-mcp/issues/239)) ([f5a4880](https://github.com/chrischall/splitwise-mcp/commit/f5a4880f31729780419f3c4c04602345256cbb9a))
+* declare the plugin MCP config under the mcpServers key Claude Code reads ([#240](https://github.com/chrischall/splitwise-mcp/issues/240)) ([4144a2d](https://github.com/chrischall/splitwise-mcp/commit/4144a2d8aae130b317a0d5e51fac92b4edadb3d3))
+* **deps:** update @chrischall/mcp-utils to 3.0.0 ([#238](https://github.com/chrischall/splitwise-mcp/issues/238)) ([a0e7a6f](https://github.com/chrischall/splitwise-mcp/commit/a0e7a6f142eb7813cb9a667866f66111b53e5757))
+* resolve low-severity audit findings ([#235](https://github.com/chrischall/splitwise-mcp/issues/235)) ([98b1e1d](https://github.com/chrischall/splitwise-mcp/commit/98b1e1dbc3a16b8adf1788aa7e7fb410d294319e))
+
 ## [3.3.0](https://github.com/chrischall/splitwise-mcp/compare/v3.2.3...v3.3.0) (2026-10-07)
 
 
