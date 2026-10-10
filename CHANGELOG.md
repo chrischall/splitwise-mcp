@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.0](https://github.com/chrischall/splitwise-mcp/compare/v3.3.1...v3.4.0) (2026-10-10)
+
+
+### Features
+
+* attach receipts on sw_create_expense and sw_update_expense ([#241](https://github.com/chrischall/splitwise-mcp/issues/241)) ([a0ed0af](https://github.com/chrischall/splitwise-mcp/commit/a0ed0affb7575e4f36f728be5e71220acd61ab0e))
+
 ## [3.3.1](https://github.com/chrischall/splitwise-mcp/compare/v3.3.0...v3.3.1) (2026-10-09)
 
 
