@@ -202,6 +202,35 @@ describe('SplitwiseClient', () => {
     }
   });
 
+  it('sends a multipart write with auth, leaving Content-Type for fetch to set', async () => {
+    const mockFetch = vi.fn().mockImplementation(async () => jsonResponse({ expenses: [{ id: 9 }] }));
+    vi.stubGlobal('fetch', mockFetch);
+    const client = new SplitwiseClient();
+    const form = new FormData();
+    form.append('description', 'Jug');
+    form.append('receipt', new Blob([Uint8Array.from([1, 2])], { type: 'image/png' }), 'r.png');
+
+    await client.requestMultipart('POST', '/create_expense', form);
+
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://secure.splitwise.com/api/v3.0/create_expense');
+    expect(init.body).toBe(form);
+    const headers = init.headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer test-key');
+    expect(Object.keys(headers).map((h) => h.toLowerCase())).not.toContain('content-type');
+  });
+
+  it('treats a 200 with errors on a multipart write as a rejection', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation(async () => jsonResponse({ expenses: [], errors: { receipt: ['is too big'] } })),
+    );
+    const client = new SplitwiseClient();
+    await expect(client.requestMultipart('POST', '/update_expense/1', new FormData())).rejects.toThrow(
+      'Splitwise rejected the request: receipt: is too big',
+    );
+  });
+
   it('sends POST body as JSON', async () => {
     const mockFetch = vi.fn().mockImplementation(async () => jsonResponse({ expense: {} }));
     vi.stubGlobal('fetch', mockFetch);

@@ -92,8 +92,8 @@ API key auth — no login flow or token rotation. The key is attached to every r
 |------|-------------|
 | `sw_list_expenses(group_id?, friend_id?, dated_after?, dated_before?, limit?, offset?, view?)` | List or search expenses |
 | `sw_get_expense(id, view?)` | Get full details of a single expense |
-| `sw_create_expense(group_id, description, cost, split_equally? \| users?)` | Create an expense — equal split or custom per-person split |
-| `sw_update_expense(expense_id, ...)` | Edit an existing expense (custom split requires full `users` array) |
+| `sw_create_expense(group_id, description, cost, split_equally? \| users?, receipt?)` | Create an expense — equal split or custom per-person split; `receipt` attaches an image/PDF in the same call |
+| `sw_update_expense(expense_id, ..., receipt?)` | Edit an existing expense (custom split requires full `users` array). `expense_id` + `receipt` alone attaches or replaces the receipt |
 | `sw_delete_expense(id)` | Soft-delete an expense |
 | `sw_undelete_expense(id)` | Restore a soft-deleted expense |
 
@@ -204,6 +204,16 @@ sw_create_expense(group_id, "Hotel", "200.00", users: [
   { user_id: theirs, paid_share: "0.00", owed_share: "80.00" }
 ])
 ```
+
+**Attach a receipt (proof of purchase):**
+
+```
+sw_create_expense(group_id, "Band camp water jug", "54.11", split_equally: true,
+                  receipt: { path: "/Users/me/Downloads/amazon-order.png" })
+sw_update_expense(expense_id, receipt: { base64: "<png/jpeg/gif/pdf bytes>", filename: "order.pdf" })
+```
+
+`receipt` takes exactly one of `path` (server's filesystem) or `base64`. PNG, JPEG, GIF or PDF, ≤ 25 MiB, type detected from the bytes. It replaces any existing receipt.
 
 **Get the receipt for an expense:**
 ```

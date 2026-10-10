@@ -5,6 +5,7 @@ import { buildQueryString, minifiedResult, resolveView, viewParam } from '@chris
 import type { SplitwiseClient } from '../client.js';
 import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
 import { UNTRUSTED_DESCRIPTION_SUFFIX, swUntrustedResult } from './_untrusted.js';
+import { buildReceiptForm, loadReceipt, receiptParam, type LoadedReceipt } from './_receipt.js';
 
 interface UserShare {
   user_id: number;
@@ -24,18 +25,21 @@ export function flattenUsers(users: UserShare[]): Record<string, unknown> {
 }
 
 function buildExpenseBody(args: Record<string, unknown>): Record<string, unknown> {
-  // `confirmToken` is a tool-gate input, not part of the Splitwise expense payload.
+  // `confirmToken` is a tool-gate input and `receipt` is sent as a file part,
+  // so neither belongs in the expense fields.
   const {
     split_equally,
     users,
     expense_id: _id,
     confirmToken: _confirmToken,
+    receipt: _receipt,
     ...rest
   } = args as {
     split_equally?: boolean;
     users?: UserShare[];
     expense_id?: number;
     confirmToken?: string;
+    receipt?: unknown;
     [key: string]: unknown;
   };
 
@@ -52,6 +56,27 @@ function buildExpenseBody(args: Record<string, unknown>): Record<string, unknown
   }
 
   return body;
+}
+
+/**
+ * Send a create/update. With a receipt the whole expense goes as multipart
+ * (Splitwise only takes a file that way); without one it stays JSON, exactly
+ * as before.
+ */
+function sendExpenseWrite(
+  client: SplitwiseClient,
+  path: string,
+  body: Record<string, unknown>,
+  receipt: LoadedReceipt | undefined,
+): Promise<unknown> {
+  return receipt
+    ? client.requestMultipart('POST', path, buildReceiptForm(body, receipt))
+    : client.request('POST', path, body);
+}
+
+/** The body the confirmation preview shows: the fields, plus the file's identity in place of its bytes. */
+function previewBody(body: Record<string, unknown>, receipt: LoadedReceipt | undefined) {
+  return receipt ? { ...body, receipt: receipt.summary } : body;
 }
 
 const userShareSchema = z.object({
@@ -133,7 +158,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_create_expense',
     {
       description:
-        `Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. This puts charges on every participant's balance and notifies them. ${CONFIRM_NOTE}`,
+        `Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. Pass receipt to attach an image or PDF in the same call. This puts charges on every participant's balance and notifies them. ${CONFIRM_NOTE}`,
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         group_id: z.number().describe('Group to add expense to (use 0 for no group)'),
@@ -156,24 +181,26 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         date: z.string().describe('ISO 8601 datetime').optional(),
         category_id: z.number().describe('Category id from sw_get_categories').optional(),
         details: z.string().describe('Notes').optional(),
+        receipt: receiptParam,
         confirmToken: confirmTokenParam,
       }),
     },
     async (args, ctx) => {
       const body = buildExpenseBody(args as Record<string, unknown>);
+      const receipt = args.receipt ? await loadReceipt(args.receipt) : undefined;
       const gate = await confirmWrite(ctx, {
         tool: 'sw_create_expense',
         action: 'expense.create',
-        summary: `Create a Splitwise expense "${args.description}" (${args.cost}) — notifies group members`,
+        summary: `Create a Splitwise expense "${args.description}" (${args.cost})${receipt ? ` with receipt ${receipt.filename}` : ''} — notifies group members`,
         method: 'POST',
         path: '/create_expense',
-        body,
+        body: previewBody(body, receipt),
         target: args.group_id,
         confirmToken: args.confirmToken,
         args,
       });
       if (gate) return gate;
-      const data = await client.request('POST', '/create_expense', body);
+      const data = await sendExpenseWrite(client, '/create_expense', body, receipt);
       return minifiedResult(data);
     },
   );
@@ -182,7 +209,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_update_expense',
     {
       description:
-        `Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split). ${CONFIRM_NOTE}`,
+        `Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split). To attach or replace the receipt on an existing expense, pass expense_id and receipt alone. ${CONFIRM_NOTE}`,
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         expense_id: z.number().describe('ID of the expense to update'),
@@ -199,25 +226,27 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         date: z.string().optional(),
         category_id: z.number().optional(),
         details: z.string().optional(),
+        receipt: receiptParam,
         confirmToken: confirmTokenParam,
       }),
     },
     async (args, ctx) => {
       const { expense_id } = args;
       const body = buildExpenseBody(args as Record<string, unknown>);
+      const receipt = args.receipt ? await loadReceipt(args.receipt) : undefined;
       const gate = await confirmWrite(ctx, {
         tool: 'sw_update_expense',
         action: 'expense.update',
-        summary: `Update Splitwise expense ${expense_id} — notifies group members`,
+        summary: `Update Splitwise expense ${expense_id}${receipt ? ` (attach receipt ${receipt.filename})` : ''} — notifies group members`,
         method: 'POST',
         path: `/update_expense/${expense_id}`,
-        body,
+        body: previewBody(body, receipt),
         target: expense_id,
         confirmToken: args.confirmToken,
         args,
       });
       if (gate) return gate;
-      const data = await client.request('POST', `/update_expense/${expense_id}`, body);
+      const data = await sendExpenseWrite(client, `/update_expense/${expense_id}`, body, receipt);
       return minifiedResult(data);
     },
   );
