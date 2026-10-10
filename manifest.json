@@ -116,11 +116,11 @@
     },
     {
       "name": "sw_create_expense",
-      "description": "Create a new expense"
+      "description": "Create a new expense, optionally with a receipt"
     },
     {
       "name": "sw_update_expense",
-      "description": "Update an expense"
+      "description": "Update an expense or attach its receipt"
     },
     {
       "name": "sw_delete_expense",

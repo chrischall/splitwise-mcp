@@ -214,6 +214,17 @@ export class SplitwiseClient {
   }
 
   /**
+   * A write sent as multipart/form-data — the only encoding Splitwise accepts
+   * for an expense that carries a receipt file. Same auth, retry and
+   * write-rejection handling as `request`.
+   */
+  async requestMultipart<T>(method: string, path: string, formData: FormData): Promise<T> {
+    const data = await this.api.fetchJson<T>(method, path, { formData });
+    assertWriteSucceeded(data);
+    return data;
+  }
+
+  /**
    * Fetch the raw bytes behind an absolute asset URL the API handed back (an
    * expense receipt). Splitwise serves receipts two ways and this covers both:
    * from its own API (`https://www.splitwise.com/api/v4.0/expenses/{id}/receipt`),

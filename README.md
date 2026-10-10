@@ -21,6 +21,7 @@ Ask Claude things like:
 - *"Show me recent expenses"*
 - *"Delete that duplicate expense"*
 - *"Download the receipt from that hotel expense"*
+- *"Add that Amazon order screenshot as the receipt on the water-jug expense"*
 
 ## Requirements
 
@@ -165,8 +166,8 @@ Every Splitwise write (creating, editing or deleting expenses, groups, friends, 
 |------|-------------|
 | `sw_list_expenses` | List or search expenses with filters |
 | `sw_get_expense` | Full details of a single expense |
-| `sw_create_expense` | Create an expense (equal or custom split) |
-| `sw_update_expense` | Edit an existing expense |
+| `sw_create_expense` | Create an expense (equal or custom split), optionally with a receipt image/PDF |
+| `sw_update_expense` | Edit an existing expense, or attach/replace its receipt |
 | `sw_delete_expense` | Soft-delete an expense |
 | `sw_undelete_expense` | Restore a deleted expense |
 | `sw_get_comments` | Get comments on an expense |
@@ -190,6 +191,8 @@ Every Splitwise write (creating, editing or deleting expenses, groups, friends, 
 ## Troubleshooting
 
 **"SPLITWISE_API_KEY is required"** -- set the environment variable in your MCP config or a `.env` file.
+
+**Attaching a receipt** -- `sw_create_expense` and `sw_update_expense` take `receipt: { path }` (a file on the server's machine) or `receipt: { base64, filename? }` (works from a hosted server too). PNG, JPEG, GIF or PDF up to 25 MiB; the type is detected from the bytes. The confirmation preview shows the file's name, type, size and SHA-256 instead of its contents. A receipt replaces any receipt already on the expense.
 
 **401 when opening a receipt URL** -- the `receipt.original` / `receipt.large` URLs on an expense are not public; they need the API key. Use `sw_get_receipt` instead of fetching them directly.
 
