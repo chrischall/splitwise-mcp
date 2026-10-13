@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.4.0](https://github.com/chrischall/splitwise-mcp/compare/v3.3.1...v3.4.0) (2026-10-13)
+
+
+### Features
+
+* add sw_attach_receipt and harden receipt uploads ([#245](https://github.com/chrischall/splitwise-mcp/issues/245)) ([2500f1a](https://github.com/chrischall/splitwise-mcp/commit/2500f1a80f558cc66ecaa8171a60d379823ebeeb))
+* attach receipts on sw_create_expense and sw_update_expense ([#241](https://github.com/chrischall/splitwise-mcp/issues/241)) ([a0ed0af](https://github.com/chrischall/splitwise-mcp/commit/a0ed0affb7575e4f36f728be5e71220acd61ab0e))
+
+
+### Bug Fixes
+
+* **deps:** bump the production-dependencies group with 2 updates ([#244](https://github.com/chrischall/splitwise-mcp/issues/244)) ([a39653e](https://github.com/chrischall/splitwise-mcp/commit/a39653effc3a54f8d7d62aa163916d0681c4e39d))
+
 ## [3.3.1](https://github.com/chrischall/splitwise-mcp/compare/v3.3.0...v3.3.1) (2026-10-09)
 
 
