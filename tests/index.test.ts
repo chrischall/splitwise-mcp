@@ -24,7 +24,7 @@ const expected = [
   'sw_delete_group', 'sw_undelete_group',
   'sw_list_friends', 'sw_create_friend', 'sw_delete_friend',
   'sw_list_expenses', 'sw_get_expense', 'sw_create_expense', 'sw_update_expense', 'sw_delete_expense',
-  'sw_undelete_expense', 'sw_get_receipt',
+  'sw_undelete_expense', 'sw_attach_receipt', 'sw_get_receipt',
   'sw_get_notifications', 'sw_get_categories', 'sw_get_currencies',
   'sw_get_comments', 'sw_create_comment', 'sw_delete_comment',
 ];
@@ -84,6 +84,7 @@ describe('tool registry', () => {
     sw_update_expense: true,
     sw_delete_expense: true,
     sw_undelete_expense: true,
+    sw_attach_receipt: true,
     sw_get_receipt: false,
     sw_create_comment: true,
     sw_delete_comment: true,

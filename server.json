@@ -29,6 +29,13 @@
           "isRequired": false,
           "format": "string",
           "isSecret": false
+        },
+        {
+          "name": "SPLITWISE_INPUT_DIR",
+          "description": "Directory receipt.path may read uploads from (unset: receipts are accepted as base64 only)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
         }
       ]
     }

@@ -138,9 +138,11 @@ export class SplitwiseClient {
    * Optional constructor seam: a hosted per-user deployment builds one client
    * per request with that user's `apiKey` injected. The stdio path passes no
    * options, so the key resolves from the environment exactly as before —
-   * byte-for-byte identical behaviour.
+   * byte-for-byte identical behaviour. `baseUrl` points the API at another
+   * origin (the HTTP integration tests' fake Splitwise); it defaults to the
+   * real API.
    */
-  constructor(opts?: { apiKey?: string }) {
+  constructor(opts?: { apiKey?: string; baseUrl?: string }) {
     // Injected apiKey (hosted per-user path) takes precedence; otherwise fall
     // back to the env var. envApiKey trims whitespace and treats
     // blank/`undefined`/`null`/`${...}` placeholder values as unset — defends
@@ -163,7 +165,7 @@ export class SplitwiseClient {
       this.configError = null;
     }
 
-    this.api = this.buildApiClient(BASE_URL, true);
+    this.api = this.buildApiClient(opts?.baseUrl ?? BASE_URL, true);
   }
 
   /**

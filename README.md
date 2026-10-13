@@ -115,6 +115,7 @@ Add to Claude Desktop config:
 |---------|----------|-------|
 | `SPLITWISE_API_KEY` | Yes | API key from [splitwise.com/apps/register](https://secure.splitwise.com/apps/register) |
 | `SPLITWISE_OUTPUT_DIR` | No | Where `sw_get_receipt` writes downloaded receipts (owner-only, mode 0600). Defaults to `~/Downloads/splitwise-mcp`, never the working directory. When set, a per-call `output_dir` must be inside it. |
+| `SPLITWISE_INPUT_DIR` | No | The only directory `receipt.path` may read from (`..` and symlinks out of it are refused). Unset — always the case on a hosted server — means receipts are accepted as `base64` only. |
 
 ## Confirmations
 
@@ -170,6 +171,7 @@ Every Splitwise write (creating, editing or deleting expenses, groups, friends, 
 | `sw_update_expense` | Edit an existing expense, or attach/replace its receipt |
 | `sw_delete_expense` | Soft-delete an expense |
 | `sw_undelete_expense` | Restore a deleted expense |
+| `sw_attach_receipt` | Attach or replace the receipt on an existing expense, changing nothing else |
 | `sw_get_comments` | Get comments on an expense |
 | `sw_create_comment` | Add a comment to an expense |
 | `sw_delete_comment` | Delete a comment |
@@ -192,7 +194,7 @@ Every Splitwise write (creating, editing or deleting expenses, groups, friends, 
 
 **"SPLITWISE_API_KEY is required"** -- set the environment variable in your MCP config or a `.env` file.
 
-**Attaching a receipt** -- `sw_create_expense` and `sw_update_expense` take `receipt: { path }` (a file on the server's machine) or `receipt: { base64, filename? }` (works from a hosted server too). PNG, JPEG, GIF or PDF up to 25 MiB; the type is detected from the bytes. The confirmation preview shows the file's name, type, size and SHA-256 instead of its contents. A receipt replaces any receipt already on the expense.
+**Attaching a receipt** -- `sw_create_expense`, `sw_update_expense` and `sw_attach_receipt` take `receipt: { base64, filename, mime_type? }` (works everywhere, including a hosted server) or, on a local server with `SPLITWISE_INPUT_DIR` set, `receipt: { path, filename }` for a file inside that directory. PNG, JPEG, GIF or PDF up to 10 MiB (Splitwise documents no limit); the type is detected from the bytes, and a `mime_type` that disagrees is refused. The confirmation preview shows the file's name, type, size and SHA-256 instead of its contents, and the token is bound to those bytes. After the write the tool checks Splitwise actually stored the file (`receipt.original`) and returns an error naming the expense if it did not. A receipt replaces any receipt already on the expense.
 
 **401 when opening a receipt URL** -- the `receipt.original` / `receipt.large` URLs on an expense are not public; they need the API key. Use `sw_get_receipt` instead of fetching them directly.
 

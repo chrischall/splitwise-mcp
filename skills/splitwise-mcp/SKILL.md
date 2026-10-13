@@ -96,6 +96,7 @@ API key auth — no login flow or token rotation. The key is attached to every r
 | `sw_update_expense(expense_id, ..., receipt?)` | Edit an existing expense (custom split requires full `users` array). `expense_id` + `receipt` alone attaches or replaces the receipt |
 | `sw_delete_expense(id)` | Soft-delete an expense |
 | `sw_undelete_expense(id)` | Restore a soft-deleted expense |
+| `sw_attach_receipt(expense_id, receipt)` | Attach or replace the receipt on an existing expense; changes nothing else |
 
 ### Receipts
 | Tool | Description |
@@ -173,8 +174,8 @@ The other eighteen tools take no `view`, each for its own reason:
 - **`sw_get_categories` and `sw_get_currencies`** are static reference lists —
   already narrow, no media, and every field on them is the answer.
 - **`sw_healthcheck`** answers reachability and auth.
-- **The fourteen writes** (`sw_create_expense`, `sw_update_expense`,
-  `sw_delete_expense`, `sw_undelete_expense`, `sw_create_group`,
+- **The fifteen writes** (`sw_create_expense`, `sw_update_expense`,
+  `sw_attach_receipt`, `sw_delete_expense`, `sw_undelete_expense`, `sw_create_group`,
   `sw_delete_group`, `sw_undelete_group`, `sw_add_user_to_group`,
   `sw_remove_user_from_group`, `sw_create_friend`, `sw_delete_friend`,
   `sw_create_comment`, `sw_delete_comment`, `sw_update_user`) return receipts —
@@ -209,11 +210,11 @@ sw_create_expense(group_id, "Hotel", "200.00", users: [
 
 ```
 sw_create_expense(group_id, "Band camp water jug", "54.11", split_equally: true,
-                  receipt: { path: "/Users/me/Downloads/amazon-order.png" })
-sw_update_expense(expense_id, receipt: { base64: "<png/jpeg/gif/pdf bytes>", filename: "order.pdf" })
+                  receipt: { base64: "<png/jpeg/gif/pdf bytes>", filename: "amazon-order.png" })
+sw_attach_receipt(expense_id, receipt: { base64: "<png/jpeg/gif/pdf bytes>", filename: "order.pdf" })
 ```
 
-`receipt` takes exactly one of `path` (server's filesystem) or `base64`. PNG, JPEG, GIF or PDF, ≤ 25 MiB, type detected from the bytes. It replaces any existing receipt.
+`receipt` takes `filename` plus exactly one of `base64` (the normal input) or `path` (only on a local server with `SPLITWISE_INPUT_DIR` set, and only inside that directory). PNG, JPEG, GIF or PDF, ≤ 10 MiB, type detected from the bytes. It replaces any existing receipt. Use `sw_attach_receipt` to add a file to an existing expense — it sends nothing but the file. If Splitwise saves the expense but drops the file, the tool returns an error naming the expense: do not re-create it, retry with `sw_attach_receipt`.
 
 **Get the receipt for an expense:**
 ```

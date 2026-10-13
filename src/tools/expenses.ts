@@ -5,7 +5,14 @@ import { buildQueryString, minifiedResult, resolveView, viewParam } from '@chris
 import type { SplitwiseClient } from '../client.js';
 import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
 import { UNTRUSTED_DESCRIPTION_SUFFIX, swUntrustedResult } from './_untrusted.js';
-import { buildReceiptForm, loadReceipt, receiptParam, type LoadedReceipt } from './_receipt.js';
+import {
+  buildReceiptForm,
+  loadReceipt,
+  receiptParam,
+  receiptSchema,
+  verifyReceiptStored,
+  type LoadedReceipt,
+} from './_receipt.js';
 
 interface UserShare {
   user_id: number;
@@ -60,18 +67,20 @@ function buildExpenseBody(args: Record<string, unknown>): Record<string, unknown
 
 /**
  * Send a create/update. With a receipt the whole expense goes as multipart
- * (Splitwise only takes a file that way); without one it stays JSON, exactly
+ * (Splitwise only takes a file that way) and the response must show the file
+ * stored; without one it stays JSON and the response passes through, exactly
  * as before.
  */
-function sendExpenseWrite(
+async function sendExpenseWrite(
   client: SplitwiseClient,
   path: string,
   body: Record<string, unknown>,
   receipt: LoadedReceipt | undefined,
+  expenseId?: number,
 ): Promise<unknown> {
-  return receipt
-    ? client.requestMultipart('POST', path, buildReceiptForm(body, receipt))
-    : client.request('POST', path, body);
+  if (!receipt) return client.request('POST', path, body);
+  const data = await client.requestMultipart('POST', path, buildReceiptForm(body, receipt));
+  return verifyReceiptStored(data, expenseId);
 }
 
 /** The body the confirmation preview shows: the fields, plus the file's identity in place of its bytes. */
@@ -246,7 +255,40 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         args,
       });
       if (gate) return gate;
-      const data = await sendExpenseWrite(client, `/update_expense/${expense_id}`, body, receipt);
+      const data = await sendExpenseWrite(client, `/update_expense/${expense_id}`, body, receipt, expense_id);
+      return minifiedResult(data);
+    },
+  );
+
+  server.registerTool(
+    'sw_attach_receipt',
+    {
+      description:
+        `Attach (or replace) the receipt image or PDF on an existing Splitwise expense. Changes nothing else on the expense — cost, split and description are not sent. Pass the file as receipt.base64. Fails if Splitwise does not store the file. ${CONFIRM_NOTE}`,
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+      inputSchema: z.object({
+        expense_id: z.number().describe('ID of the expense to attach the receipt to'),
+        receipt: receiptSchema,
+        confirmToken: confirmTokenParam,
+      }),
+    },
+    async (args, ctx) => {
+      const { expense_id } = args;
+      const receipt = await loadReceipt(args.receipt);
+      const path = `/update_expense/${expense_id}`;
+      const gate = await confirmWrite(ctx, {
+        tool: 'sw_attach_receipt',
+        action: 'expense.attach_receipt',
+        summary: `Attach receipt ${receipt.filename} to Splitwise expense ${expense_id} (replaces any existing receipt)`,
+        method: 'POST',
+        path,
+        body: previewBody({}, receipt),
+        target: expense_id,
+        confirmToken: args.confirmToken,
+        args,
+      });
+      if (gate) return gate;
+      const data = await sendExpenseWrite(client, path, {}, receipt, expense_id);
       return minifiedResult(data);
     },
   );
