@@ -1,11 +1,14 @@
 import { createHash } from 'crypto';
+import { readEnvVar } from '@chrischall/mcp-utils';
 import { z } from 'zod';
 
 /**
- * Splitwise does not document an upload cap. This bound matches the receipt
- * download cap, so anything this server accepts it can also read back.
+ * Splitwise does not document an upload cap, so this is a conservative 10 MiB:
+ * comfortably above a phone photo or a multi-page PDF receipt, and small
+ * enough that the base64 form (≈13.4 MiB) stays a reasonable tool argument.
  */
-export const MAX_RECEIPT_BYTES = 25 * 1024 * 1024;
+export const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
+const LIMIT_LABEL = '10 MiB';
 
 /** The types the Splitwise web UI offers ("Attach an image or PDF"). */
 const RECEIPT_TYPES = [
@@ -15,33 +18,36 @@ const RECEIPT_TYPES = [
   { mime: 'application/pdf', ext: 'pdf', magic: [0x25, 0x50, 0x44, 0x46, 0x2d] },
 ] as const;
 
-export const receiptParam = z
+/** Spellings a caller may reasonably send for a detected type. */
+const MIME_ALIASES: Record<string, string> = { 'image/jpg': 'image/jpeg', 'image/pjpeg': 'image/jpeg' };
+
+export const receiptSchema = z
   .object({
+    base64: z
+      .string()
+      .min(1)
+      .describe('The file bytes, base64-encoded (a data: URL prefix is accepted and stripped). The normal way to pass a receipt.')
+      .optional(),
     path: z
       .string()
       .min(1)
       .describe(
-        'Absolute path to an image or PDF on the machine running this server. Not usable from a hosted deployment — use base64 there.',
+        'A file inside SPLITWISE_INPUT_DIR on the machine running this server (relative to it, or absolute). Only works when that variable is set — never on a hosted server; use base64 there.',
       )
       .optional(),
-    base64: z
+    filename: z.string().min(1).max(200).describe('Name to store the file under, e.g. "receipt.pdf".'),
+    mime_type: z
       .string()
-      .min(1)
-      .describe('The file bytes, base64-encoded (a data: URL prefix is accepted and stripped).')
-      .optional(),
-    filename: z
-      .string()
-      .min(1)
-      .max(200)
-      .describe('Name to store the file under. Defaults to the path basename, or receipt.<ext>.')
+      .describe('Optional. If given, it must match the type detected from the file contents.')
       .optional(),
   })
   .describe(
-    'Receipt to attach: PNG, JPEG, GIF or PDF, up to 25 MiB. Give exactly one of path or base64. The type is detected from the file contents. Replaces any receipt already on the expense.',
-  )
-  .optional();
+    `Receipt to attach: PNG, JPEG, GIF or PDF, up to ${LIMIT_LABEL}. Give exactly one of base64 or path. The type is detected from the file contents. Replaces any receipt already on the expense.`,
+  );
 
-export type ReceiptInput = z.infer<typeof receiptParam>;
+export const receiptParam = receiptSchema.optional();
+
+export type ReceiptInput = z.infer<typeof receiptSchema>;
 
 export interface LoadedReceipt {
   bytes: Uint8Array<ArrayBuffer>;
@@ -51,12 +57,19 @@ export interface LoadedReceipt {
   summary: { filename: string; mime_type: string; bytes: number; sha256: string };
 }
 
+const tooBig = (size: number) =>
+  new Error(`Receipt is ${size} bytes, over the ${LIMIT_LABEL} limit (${MAX_RECEIPT_BYTES} bytes)`);
+
 function sniff(bytes: Uint8Array): (typeof RECEIPT_TYPES)[number] | undefined {
   return RECEIPT_TYPES.find((t) => t.magic.every((b, i) => bytes[i] === b));
 }
 
 function decodeBase64(input: string): Uint8Array<ArrayBuffer> {
   const stripped = input.replace(/^data:[^;,]*;base64,/i, '').replace(/\s+/g, '');
+  // Refuse on the encoded length so an oversized argument is never decoded.
+  const decodedSize = Math.floor((stripped.length * 3) / 4) - (stripped.match(/=*$/)?.[0].length ?? 0);
+  if (decodedSize > MAX_RECEIPT_BYTES) throw tooBig(decodedSize);
+  // Never echo the input: it is the caller's file.
   if (!/^[A-Za-z0-9+/]*={0,2}$/.test(stripped) || stripped.length % 4 === 1) {
     throw new Error('receipt.base64 is not valid base64');
   }
@@ -70,50 +83,80 @@ function cleanFilename(name: string): string {
 }
 
 /**
+ * Read a receipt from SPLITWISE_INPUT_DIR. Unset means no filesystem access at
+ * all — the hosted case, where the caller's files are not on this machine and
+ * the server's own files must not be reachable. Both the dir and the target
+ * are realpath-resolved, so `..` and symlinks (to a file or through a
+ * directory) that lead out of the dir are refused; the bytes are then read
+ * through the handle that was checked, not by re-opening the name.
+ */
+async function readSandboxed(requested: string): Promise<Uint8Array<ArrayBuffer>> {
+  const dir = readEnvVar('SPLITWISE_INPUT_DIR');
+  if (!dir) {
+    throw new Error(
+      'receipt.path is disabled: SPLITWISE_INPUT_DIR is not set on this server (and a hosted server cannot see your files). Pass the file as receipt.base64 instead.',
+    );
+  }
+  const { open, realpath } = await import('fs/promises');
+  const { constants } = await import('fs');
+  const { isAbsolute, relative, resolve, sep } = await import('path');
+
+  let root: string;
+  try {
+    root = await realpath(dir);
+  } catch (err) {
+    throw new Error(`SPLITWISE_INPUT_DIR (${dir}) is not readable: ${(err as Error).message}`);
+  }
+  let target: string;
+  try {
+    target = await realpath(resolve(root, requested));
+  } catch (err) {
+    throw new Error(`Cannot read receipt file ${requested}: ${(err as NodeJS.ErrnoException).code ?? (err as Error).message}`);
+  }
+  const rel = relative(root, target);
+  if (rel === '' || rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    throw new Error(`receipt.path ${requested} resolves outside SPLITWISE_INPUT_DIR`);
+  }
+
+  // O_NOFOLLOW: a symlink swapped in after the realpath check is refused.
+  const handle = await open(target, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const info = await handle.stat();
+    if (!info.isFile()) throw new Error(`Cannot read receipt file ${requested}: not a regular file`);
+    if (info.size > MAX_RECEIPT_BYTES) throw tooBig(info.size);
+    return Uint8Array.from(await handle.readFile());
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
  * Read and validate a receipt before the confirmation gate, so a bad file is
  * refused on the first call and the preview can name exactly what will be sent.
  */
-export async function loadReceipt(input: NonNullable<ReceiptInput>): Promise<LoadedReceipt> {
+export async function loadReceipt(input: ReceiptInput): Promise<LoadedReceipt> {
   const hasPath = input.path !== undefined;
   const hasBase64 = input.base64 !== undefined;
   if (hasPath === hasBase64) {
     throw new Error('receipt needs exactly one of path or base64');
   }
 
-  let bytes: Uint8Array<ArrayBuffer>;
-  if (hasPath) {
-    // Lazy import: a hosted deployment that only ever sends base64 never
-    // touches the filesystem module.
-    const { readFile, stat } = await import('fs/promises');
-    let size: number;
-    try {
-      const info = await stat(input.path!);
-      if (!info.isFile()) throw new Error('not a regular file');
-      size = info.size;
-    } catch (err) {
-      throw new Error(`Cannot read receipt file ${input.path}: ${(err as Error).message}`);
-    }
-    if (size > MAX_RECEIPT_BYTES) {
-      throw new Error(`Receipt file is ${size} bytes; the limit is ${MAX_RECEIPT_BYTES}`);
-    }
-    bytes = Uint8Array.from(await readFile(input.path!));
-  } else {
-    bytes = decodeBase64(input.base64!);
-  }
-
+  const bytes = hasPath ? await readSandboxed(input.path!) : decodeBase64(input.base64!);
   if (bytes.length === 0) throw new Error('Receipt file is empty');
-  if (bytes.length > MAX_RECEIPT_BYTES) {
-    throw new Error(`Receipt is ${bytes.length} bytes; the limit is ${MAX_RECEIPT_BYTES}`);
-  }
+  if (bytes.length > MAX_RECEIPT_BYTES) throw tooBig(bytes.length);
 
   const type = sniff(bytes);
   if (!type) {
     throw new Error('Receipt must be a PNG, JPEG, GIF or PDF (detected from the file contents)');
   }
+  if (input.mime_type !== undefined) {
+    const claimed = input.mime_type.trim().toLowerCase();
+    if ((MIME_ALIASES[claimed] ?? claimed) !== type.mime) {
+      throw new Error(`receipt.mime_type ${claimed} does not match the file contents (${type.mime})`);
+    }
+  }
 
-  let filename = cleanFilename(input.filename ?? (hasPath ? input.path! : ''));
-  if (!filename) filename = `receipt.${type.ext}`;
-
+  const filename = cleanFilename(input.filename) || `receipt.${type.ext}`;
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   return {
     bytes,
@@ -125,7 +168,8 @@ export async function loadReceipt(input: NonNullable<ReceiptInput>): Promise<Loa
 
 /**
  * Build the multipart body Splitwise takes when an expense carries a file:
- * every expense field as a form field, plus the file under `receipt`.
+ * every expense field as a form field (the same flat `users__N__*` keys the
+ * JSON path sends), plus the file under `receipt`.
  */
 export function buildReceiptForm(fields: Record<string, unknown>, receipt: LoadedReceipt): FormData {
   const form = new FormData();
@@ -135,4 +179,23 @@ export function buildReceiptForm(fields: Record<string, unknown>, receipt: Loade
   }
   form.append('receipt', new Blob([receipt.bytes], { type: receipt.mimeType }), receipt.filename);
   return form;
+}
+
+/**
+ * After a receipt write, confirm Splitwise actually stored the file. It can
+ * answer 200 with the expense saved and `receipt.original` still null; that is
+ * a failure the caller must hear about, not a success. Returns the response
+ * with `receipt_attached` and the expense's `receipt` lifted to the top.
+ */
+export function verifyReceiptStored(data: unknown, expenseId: number | undefined): Record<string, unknown> {
+  const expense = (data as { expenses?: Array<{ id?: number; receipt?: { original?: unknown } }> } | null)
+    ?.expenses?.[0];
+  const id = expense?.id ?? expenseId;
+  if (!expense?.receipt?.original) {
+    throw new Error(
+      `Splitwise saved expense ${id ?? '(unknown id)'} but did not attach the receipt (receipt.original is empty). ` +
+        `The expense itself was written — do not re-create it; retry the file with sw_attach_receipt on expense ${id ?? '<id>'}.`,
+    );
+  }
+  return { receipt_attached: true, receipt: expense.receipt, ...(data as object) };
 }

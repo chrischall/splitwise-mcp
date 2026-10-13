@@ -7,7 +7,8 @@
       ],
       "env": {
         "SPLITWISE_API_KEY": "${SPLITWISE_API_KEY}",
-        "SPLITWISE_OUTPUT_DIR": "${SPLITWISE_OUTPUT_DIR}"
+        "SPLITWISE_OUTPUT_DIR": "${SPLITWISE_OUTPUT_DIR}",
+        "SPLITWISE_INPUT_DIR": "${SPLITWISE_INPUT_DIR}"
       }
     }
   }

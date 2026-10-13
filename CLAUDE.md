@@ -1,6 +1,6 @@
 # splitwise-mcp
 
-MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 27 tools to Claude over stdio. Built on `@chrischall/mcp-utils` (`runMcp`, `createApiClient`, `readEnvVar`, `textResult`).
+MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 28 tools to Claude over stdio. Built on `@chrischall/mcp-utils` (`runMcp`, `createApiClient`, `readEnvVar`, `textResult`).
 
 ## Commands
 
@@ -36,11 +36,13 @@ src/
                   #   sw_add_user_to_group, sw_remove_user_from_group
     friends.ts    # sw_list_friends, sw_create_friend, sw_delete_friend
     expenses.ts   # sw_list_expenses, sw_get_expense, sw_create_expense,
-                  #   sw_update_expense, sw_delete_expense, sw_undelete_expense
+                  #   sw_update_expense, sw_attach_receipt, sw_delete_expense,
+                  #   sw_undelete_expense
     receipts.ts   # sw_get_receipt — authenticated receipt download,
                   #   inline bytes, and PDF text extraction
-    _receipt.ts   # receipt UPLOAD for create/update: loadReceipt (path|base64,
-                  #   magic-byte type check, 25 MiB cap) + buildReceiptForm
+    _receipt.ts   # receipt UPLOAD for create/update/attach: loadReceipt (base64 |
+                  #   sandboxed path, magic-byte type check, 10 MiB cap),
+                  #   buildReceiptForm, verifyReceiptStored
     utilities.ts  # sw_get_notifications, sw_get_categories, sw_get_currencies,
                   #   sw_get_comments, sw_create_comment, sw_delete_comment
     _confirm.ts   # confirmWrite(): the confirmation gate every write goes through
@@ -55,6 +57,7 @@ Each tool file exports a `register<Domain>Tools(server, client)` function that c
 ```
 SPLITWISE_API_KEY=<your key>   # Required. From https://secure.splitwise.com/apps/register
 SPLITWISE_OUTPUT_DIR=<path>    # Optional. Where sw_get_receipt writes files (default: ~/Downloads/splitwise-mcp, dir 0700, files 0600)
+SPLITWISE_INPUT_DIR=<path>     # Optional. The only dir receipt.path may read; unset (the hosted case) = base64 only
 ```
 
 Loaded via `loadDotenvSafely` (from `@chrischall/mcp-utils`) from `.env` next to `dist/`, with `override: false` so a host-provided value always wins; a missing `dotenv` module is swallowed (mcpb bundles externalize it — see `bundle` script's `--external:dotenv` — and the host provides env). `readEnvVar` (also from `@chrischall/mcp-utils`) treats blank, `"undefined"`, `"null"`, and unsubstituted `${FOO}` placeholders as unset.
@@ -133,6 +136,7 @@ write-verification, transport archetypes, testing traps) live in
 - **Receipts need auth**: the `receipt.original` / `receipt.large` URLs on an expense 401 without the API key. `sw_get_receipt` re-fetches them through `SplitwiseClient.fetchAsset`, which builds a per-origin `createApiClient` and attaches the key **only** for `*.splitwise.com` hosts — a receipt can also be served from a presigned S3 URL, which must never see the key. Errors from that path run through `redactAssetQuery`, which scrubs the exact query bytes that were sent, so a signed query string can't land in a tool result — including when an upstream echoes the whole URL back in its error body.
 - **Receipts must not depend on the filesystem**: `sw_get_receipt`'s file write is *best effort*. A hosted deployment runs from a read-only npm cache, so an unconditional write fails the whole call (`EACCES` on `<cache>/node_modules/splitwise-mcp/...`) and the caller — whose sandbox is a different filesystem anyway — can never read the path. The write is wrapped: on failure the tool reports `write_error` and still returns whatever content was asked for, and it only throws when nothing at all reached the caller (no file, no `inline`, no `text`) — with an error naming `inline:true` / `extract_text:true` as the way out. `inline` covers every type: an image block for images, an MCP embedded resource (`{type:'resource', resource:{uri, mimeType, blob}}`) for PDFs and anything else.
 - **`unpdf` is lazily imported**: `extract_text` pulls a full pdf.js build (~2.4 MB in `dist/bundle.js`). It's behind `await import('unpdf')` inside the handler so no other receipt path — and no server startup — pays for it. `getDocumentProxy` detaches the buffer it's handed, so `extractPdfText` copies via `Uint8Array.from` first; without that copy the base64 and the file write would see an empty buffer.
-- **Receipt upload is multipart**: when `sw_create_expense` / `sw_update_expense` get a `receipt`, the whole expense is sent as multipart/form-data via `SplitwiseClient.requestMultipart` (Splitwise only accepts files that way); without one they stay JSON. The file is loaded and validated BEFORE the confirm gate, and the preview's `willSend.receipt` is `{filename, mime_type, bytes, sha256}` — never the bytes, so a token is bound to the exact file.
+- **Receipt upload is multipart**: when `sw_create_expense` / `sw_update_expense` get a `receipt`, the whole expense is sent as multipart/form-data via `SplitwiseClient.requestMultipart` (Splitwise only accepts files that way); without one they stay JSON. The file is loaded and validated BEFORE the confirm gate, and the preview's `willSend.receipt` is `{filename, mime_type, bytes, sha256}` — never the bytes, so a token is bound to the exact file. After the write, `verifyReceiptStored` requires `expenses[0].receipt.original` — Splitwise can 200 with the file dropped, and that must be an error naming the expense, not a success.
+- **`receipt.path` is sandboxed**: it reads nothing unless `SPLITWISE_INPUT_DIR` is set (a hosted runner never sets it, so a caller can't make the server upload its own files). Dir and target are both `realpath`-resolved and the target must stay inside; the bytes are read from the handle that was `stat`ed.
 - **`manifest.json` tool list**: nothing generates it. `tests/index.test.ts` asserts it matches the registered tools — add new tools in both places.
 - **Plugin files**: `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` are for Claude Code plugin distribution — not part of the MCP runtime.
