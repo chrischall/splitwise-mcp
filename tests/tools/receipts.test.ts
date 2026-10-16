@@ -477,6 +477,25 @@ describe('sw_get_receipt', () => {
     await harness.close();
   });
 
+  // fleet-audit#1301: the extension comes from mcp-utils extensionForMime —
+  // the MIME type first, then the receipt URL's own extension, then `bin`.
+  it.each([
+    ['https://splitwise.s3.amazonaws.com/uploads/r/receipt.TIFF?sig=1', 'application/octet-stream', 'tiff'],
+    [API_RECEIPT_URL, 'application/octet-stream', 'bin'],
+    [API_RECEIPT_URL, 'image/tiff', 'tif'],
+  ])('names an unsniffable receipt from %s (%s) as .%s', async (receiptUrl, contentType, ext) => {
+    const unknown = new Uint8Array([0x01, 0x02, 0x03, 0x04, 0x05, 0x06])
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(expenseResponse({ original: receiptUrl }))
+      .mockResolvedValueOnce(binaryResponse(unknown, contentType));
+    const harness = await harnessWith(fetchMock);
+    const body = parseToolResult<{ path: string }>(
+      await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir }),
+    );
+    expect(basename(body.path)).toBe(`splitwise-receipt-4644814211.${ext}`);
+    await harness.close();
+  });
+
   it('blames the missing text layer, not the flag the caller already passed', async () => {
     // Read-only server + extract_text on a scan: advising extract_text:true
     // here would be advice to repeat the call that just failed.

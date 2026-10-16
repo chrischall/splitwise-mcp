@@ -1,9 +1,10 @@
 {
   "mcpServers": {
     "splitwise": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "${CLAUDE_PLUGIN_ROOT}/dist/index.js"
+        "-y",
+        "splitwise-mcp"
       ],
       "env": {
         "SPLITWISE_API_KEY": "${SPLITWISE_API_KEY}",
