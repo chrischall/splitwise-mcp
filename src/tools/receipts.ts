@@ -7,6 +7,7 @@ import {
   resolveOutputDir,
   writeBinaryOutput,
   sniffMimeBytes,
+  extensionForMime,
 } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { UNTRUSTED_DESCRIPTION_SUFFIX, swUntrustedEnvelope } from './_untrusted.js';
@@ -73,24 +74,6 @@ function resolveMimeType(contentType: string | null, bytes: Uint8Array): string 
   if (sniffed) return sniffed;
   const declared = (contentType ?? '').split(';')[0]!.trim().toLowerCase();
   return declared && !GENERIC_TYPES.has(declared) ? declared : undefined;
-}
-
-/** Extension from a URL path (`…/receipt.jpg?sig=…` → `jpg`), when it has one. */
-function extensionFromUrl(url: string): string | undefined {
-  const match = /\.([a-z0-9]{1,5})$/i.exec(new URL(url).pathname);
-  return match ? match[1]!.toLowerCase() : undefined;
-}
-
-/**
- * File extension for the receipt: the MIME subtype when it looks like a plain
- * one (`application/pdf` → `pdf`, `image/heic` → `heic`), else the URL's own
- * extension, else `bin`.
- */
-function extensionFor(mimeType: string | undefined, url: string): string {
-  const subtype = mimeType?.split('/')[1];
-  if (subtype === 'jpeg') return 'jpg';
-  if (subtype && /^[a-z0-9]{1,5}$/.test(subtype)) return subtype;
-  return extensionFromUrl(url) ?? 'bin';
 }
 
 /**
@@ -215,7 +198,8 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
             }),
             baseName: `splitwise-receipt-${id}`,
             base64,
-            extension: extensionFor(mimeType, url),
+            // The MIME type, else the receipt URL's own extension, else `bin`.
+            extension: extensionForMime(mimeType, { url }),
             mode: RECEIPT_FILE_MODE,
           });
         } catch (err) {
