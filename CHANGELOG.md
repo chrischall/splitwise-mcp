@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.1](https://github.com/chrischall/splitwise-mcp/compare/v3.4.0...v3.4.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* launch the published plugin package and name receipts via the shared MIME table ([#247](https://github.com/chrischall/splitwise-mcp/issues/247)) ([a439dc9](https://github.com/chrischall/splitwise-mcp/commit/a439dc96a2f59f4578da18073539d51afe6435d2))
+
 ## [3.4.0](https://github.com/chrischall/splitwise-mcp/compare/v3.3.1...v3.4.0) (2026-10-13)
 
 
