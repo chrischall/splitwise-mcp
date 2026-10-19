@@ -36,7 +36,7 @@ function asList(v: unknown): unknown[] {
 }
 
 /** "Alison Hall" from the first/last pair Splitwise returns on every user shape. */
-function nameOf(user: Dict | undefined): string | undefined {
+export function nameOf(user: Dict | undefined): string | undefined {
   if (!user) return undefined;
   const parts = [user.first_name, user.last_name].filter((p): p is string => typeof p === 'string' && p !== '');
   return parts.length > 0 ? parts.join(' ') : undefined;
@@ -116,8 +116,6 @@ export function compactGroup(raw: unknown): Dict {
  */
 export function compactExpense(raw: unknown): Dict {
   const e = asDict(raw) ?? {};
-  const receipt = asDict(e.receipt);
-  const original = receipt?.original;
   return pruneUndefined({
     id: e.id,
     group_id: e.group_id,
@@ -130,9 +128,14 @@ export function compactExpense(raw: unknown): Dict {
     payment: e.payment === true ? true : undefined,
     created_by: nameOf(asDict(e.created_by)),
     updated_at: e.updated_at,
+    updated_by: nameOf(asDict(e.updated_by)),
     // Kept only when set. A deleted expense still comes back from the list
     // endpoint, and a caller that cannot see `deleted_at` will count it.
     deleted_at: e.deleted_at ?? undefined,
+    // Who deleted it is the first question after "is it deleted" — in a shared
+    // group it is often not the caller. Without it here, every reconciliation
+    // needed a second `view: "full"` read.
+    deleted_by: e.deleted_at ? nameOf(asDict(e.deleted_by)) : undefined,
     comments_count: e.comments_count,
     repayments: e.repayments,
     users: asList(e.users).map((entry) => {
@@ -146,9 +149,41 @@ export function compactExpense(raw: unknown): Dict {
       };
     }),
     // A receipt is evidence; `sw_get_receipt` is how a caller fetches it.
-    has_receipt: typeof original === 'string' ? true : undefined,
+    // Always stated: "no receipt" is a fact a reconciliation acts on.
+    has_receipt: hasReceipt(e),
   });
 }
+
+function hasReceipt(e: Dict): boolean {
+  return typeof asDict(e.receipt)?.original === 'string';
+}
+
+/**
+ * The `rows` rung of `sw_list_expenses`: one flat line per expense, for
+ * reconciling a long history. A year of one group came back as ~110K
+ * characters on `compact` — the share breakdown and repayments are most of
+ * that, and a "which of these are duplicates / who deleted what" pass needs
+ * none of it. `sw_get_expense` has the rest.
+ */
+export function rowExpense(raw: unknown): Dict {
+  const e = asDict(raw) ?? {};
+  return pruneUndefined({
+    id: e.id,
+    date: e.date,
+    description: e.description,
+    cost: e.cost,
+    currency_code: e.currency_code,
+    category: asDict(e.category)?.name,
+    created_by: nameOf(asDict(e.created_by)),
+    deleted_at: e.deleted_at ?? undefined,
+    deleted_by: e.deleted_at ? nameOf(asDict(e.deleted_by)) : undefined,
+    comments_count: e.comments_count,
+    has_receipt: hasReceipt(e),
+  });
+}
+
+/** `sw_list_expenses` alone also offers `rows`. */
+export const EXPENSE_LIST_VIEWS = [...SW_VIEWS, 'rows'] as const;
 
 /**
  * Project a payload's `<key>` array, or hand the whole thing back.

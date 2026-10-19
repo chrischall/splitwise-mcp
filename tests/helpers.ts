@@ -34,15 +34,24 @@ export async function confirmedCall(
   name: string,
   args: Record<string, unknown>,
 ): Promise<{ phase1: ConfirmationRequired; result: CallToolResult }> {
-  const before = write.mock.calls.length;
+  const before = writes(write);
   const first = await harness.callTool(name, args);
   expect(first.isError).toBeFalsy();
   const phase1 = parseToolResult<ConfirmationRequired>(first);
   expect(phase1.status).toBe('confirmation-required');
   expect(typeof phase1.confirmToken).toBe('string');
-  expect(write.mock.calls.length).toBe(before);
+  expect(writes(write)).toBe(before);
 
   const result = await harness.callTool(name, { ...args, confirmToken: phase1.confirmToken });
-  expect(write.mock.calls.length).toBe(before + 1);
+  expect(writes(write)).toBe(before + 1);
   return { phase1, result };
+}
+
+/**
+ * Calls on `write` that could change something. A gated write may READ first —
+ * the deleted-expense pre-check, the duplicate scan — and those GETs go through
+ * the same `client.request`, so they are not counted.
+ */
+export function writes(write: { mock: { calls: unknown[] } }): number {
+  return write.mock.calls.filter((call) => !(Array.isArray(call) && call[0] === 'GET')).length;
 }

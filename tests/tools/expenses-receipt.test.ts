@@ -6,7 +6,7 @@ import { join } from 'path';
 import { registerExpenseTools } from '../../src/tools/expenses.js';
 import { buildReceiptForm, loadReceipt, MAX_RECEIPT_BYTES } from '../../src/tools/_receipt.js';
 import { client } from '../../src/client.js';
-import { confirmedCall, createTestHarness, parseToolResult } from '../helpers.js';
+import { confirmedCall, createTestHarness, parseToolResult, writes } from '../helpers.js';
 
 const mockRequest = vi.spyOn(client, 'request').mockResolvedValue(undefined as never);
 const mockMultipart = vi.spyOn(client, 'requestMultipart').mockResolvedValue(undefined as never);
@@ -65,7 +65,7 @@ describe('receipt on sw_create_expense', () => {
     expect(phase1.confirmToken.length).toBeLessThan(1024);
     expect(phase1.preview.action).toContain('with receipt order.png');
 
-    expect(mockRequest).not.toHaveBeenCalled();
+    expect(writes(mockRequest)).toBe(0);
     const [method, path, form] = mockMultipart.mock.calls[0] as [string, string, FormData];
     expect(method).toBe('POST');
     expect(path).toBe('/create_expense');
@@ -126,7 +126,7 @@ describe('receipt on sw_create_expense', () => {
       ],
     });
     expect(mockMultipart).not.toHaveBeenCalled();
-    expect(mockRequest.mock.calls[0]).toEqual([
+    expect(mockRequest.mock.calls.find((c) => c[0] === 'POST')).toEqual([
       'POST',
       '/create_expense',
       {
@@ -141,8 +141,11 @@ describe('receipt on sw_create_expense', () => {
         users__1__owed_share: '5.00',
       },
     ]);
-    // ...and the result is Splitwise's response untouched (no receipt_attached).
-    expect(parseToolResult(result)).toEqual({ expenses: [{ id: 3 }] });
+    // ...and the result is Splitwise's response (no receipt_attached), with the post-state lifted out.
+    expect(parseToolResult(result)).toEqual({
+      post_state: { id: 3, deleted_at: null, deleted_by: null, updated_at: null, updated_by: null },
+      expenses: [{ id: 3 }],
+    });
   });
 
   it('refuses a non-image, non-PDF file on the first call, before the gate', async () => {
@@ -156,7 +159,7 @@ describe('receipt on sw_create_expense', () => {
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result)).toContain('PNG, JPEG, GIF or PDF');
     expect(mockMultipart).not.toHaveBeenCalled();
-    expect(mockRequest).not.toHaveBeenCalled();
+    expect(writes(mockRequest)).toBe(0);
   });
 
   it('fails loudly, naming the expense, when Splitwise saves it but drops the file', async () => {
@@ -250,7 +253,7 @@ describe('sw_attach_receipt', () => {
     const [method, path, form] = mockMultipart.mock.calls[0] as [string, string, FormData];
     expect([method, path]).toEqual(['POST', '/update_expense/4644807844']);
     expect([...form.keys()]).toEqual(['receipt']);
-    expect(mockRequest).not.toHaveBeenCalled();
+    expect(writes(mockRequest)).toBe(0);
     const out = parseToolResult<Record<string, unknown>>(result);
     expect(out.receipt_attached).toBe(true);
     expect(out.receipt).toEqual(attached(4644807844).expenses[0].receipt);

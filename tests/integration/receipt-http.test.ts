@@ -22,7 +22,9 @@ const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 7, 
 const b64 = (bytes: Uint8Array) => Buffer.from(bytes).toString('base64');
 
 let server: Server;
+/** The WRITES the fake Splitwise received. A tool's pre-flight reads (the deleted-expense check) are kept apart. */
 let captured: Captured[] = [];
+let reads: Captured[] = [];
 /** What the fake Splitwise answers next; defaults to "receipt stored". */
 let respond: (req: Captured) => unknown;
 let harness: Awaited<ReturnType<typeof createTestHarness>>;
@@ -44,7 +46,7 @@ async function formOf(req: Captured): Promise<FormData> {
 async function confirmed(name: string, args: Record<string, unknown>) {
   const first = parseToolResult<{ status: string; confirmToken: string }>(await harness.callTool(name, args));
   expect(first.status).toBe('confirmation-required');
-  expect(captured).toHaveLength(0); // phase 1 never reaches Splitwise
+  expect(captured).toHaveLength(0); // phase 1 never writes to Splitwise
   return harness.callTool(name, { ...args, confirmToken: first.confirmToken });
 }
 
@@ -54,7 +56,7 @@ beforeAll(async () => {
     req.on('data', (c: Buffer) => chunks.push(c));
     req.on('end', () => {
       const entry = { method: req.method!, url: req.url!, headers: req.headers, raw: Buffer.concat(chunks) };
-      captured.push(entry);
+      (req.method === 'GET' ? reads : captured).push(entry);
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(respond(entry)));
     });
@@ -72,6 +74,7 @@ afterAll(async () => {
 
 beforeEach(() => {
   captured = [];
+  reads = [];
   respond = () => stored(1);
 });
 

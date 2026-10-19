@@ -5,6 +5,7 @@ import { buildQueryString, minifiedResult, resolveView, viewParam } from '@chris
 import type { SplitwiseClient } from '../client.js';
 import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
 import { UNTRUSTED_DESCRIPTION_SUFFIX, swUntrustedResult } from './_untrusted.js';
+import { assertNotDeleted, explainForbidden } from './_expense-state.js';
 
 export function registerUtilityTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool(
@@ -74,7 +75,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     'sw_create_comment',
     {
       description:
-        `Add a comment to a Splitwise expense (visible to other participants). ${CONFIRM_NOTE}`,
+        `Add a comment to a Splitwise expense (visible to other participants). Refused up front, naming who deleted it, if the expense is deleted — restore it with sw_undelete_expense first. ${CONFIRM_NOTE}`,
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         expense_id: z.number().describe('Expense ID to comment on'),
@@ -84,6 +85,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     },
     async (args, ctx) => {
       const { expense_id, content, confirmToken } = args;
+      await assertNotDeleted(client, expense_id);
       const gate = await confirmWrite(ctx, {
         tool: 'sw_create_comment',
         action: 'comment.create',
@@ -96,7 +98,9 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
         args,
       });
       if (gate) return gate;
-      const data = await client.request('POST', '/create_comment', { expense_id, content });
+      const data = await explainForbidden(client, expense_id, () =>
+        client.request('POST', '/create_comment', { expense_id, content }),
+      );
       return minifiedResult(data);
     },
   );

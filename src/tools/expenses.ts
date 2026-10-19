@@ -13,6 +13,7 @@ import {
   verifyReceiptStored,
   type LoadedReceipt,
 } from './_receipt.js';
+import { assertNotDeleted, explainForbidden, verifyRestored, withPostState } from './_expense-state.js';
 
 interface UserShare {
   user_id: number;
@@ -210,7 +211,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
       });
       if (gate) return gate;
       const data = await sendExpenseWrite(client, '/create_expense', body, receipt);
-      return minifiedResult(data);
+      return minifiedResult(withPostState(data));
     },
   );
 
@@ -243,6 +244,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
       const { expense_id } = args;
       const body = buildExpenseBody(args as Record<string, unknown>);
       const receipt = args.receipt ? await loadReceipt(args.receipt) : undefined;
+      await assertNotDeleted(client, expense_id);
       const gate = await confirmWrite(ctx, {
         tool: 'sw_update_expense',
         action: 'expense.update',
@@ -255,8 +257,10 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         args,
       });
       if (gate) return gate;
-      const data = await sendExpenseWrite(client, `/update_expense/${expense_id}`, body, receipt, expense_id);
-      return minifiedResult(data);
+      const data = await explainForbidden(client, expense_id, () =>
+        sendExpenseWrite(client, `/update_expense/${expense_id}`, body, receipt, expense_id),
+      );
+      return minifiedResult(withPostState(data));
     },
   );
 
@@ -276,6 +280,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
       const { expense_id } = args;
       const receipt = await loadReceipt(args.receipt);
       const path = `/update_expense/${expense_id}`;
+      await assertNotDeleted(client, expense_id);
       const gate = await confirmWrite(ctx, {
         tool: 'sw_attach_receipt',
         action: 'expense.attach_receipt',
@@ -288,8 +293,8 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         args,
       });
       if (gate) return gate;
-      const data = await sendExpenseWrite(client, path, {}, receipt, expense_id);
-      return minifiedResult(data);
+      const data = await explainForbidden(client, expense_id, () => sendExpenseWrite(client, path, {}, receipt, expense_id));
+      return minifiedResult(withPostState(data));
     },
   );
 
@@ -326,7 +331,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_undelete_expense',
     {
       description:
-        `Restore a soft-deleted Splitwise expense. This puts its charges back on every participant's balance and notifies them, so it is gated like the other writes. ${CONFIRM_NOTE}`,
+        `Restore a soft-deleted Splitwise expense, then re-read it and return post_state {deleted_at, deleted_by, updated_at, updated_by}; if it is still (or again) deleted, the call fails naming who deleted it and when. This puts its charges back on every participant's balance and notifies them, so it is gated like the other writes. ${CONFIRM_NOTE}`,
       // Destructive despite the delete tool being its record-level inverse:
       // the restore notifies every participant, and no later call un-sends that.
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
@@ -349,7 +354,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
       });
       if (gate) return gate;
       const data = await client.request('POST', `/undelete_expense/${id}`);
-      return minifiedResult(data);
+      return minifiedResult(await verifyRestored(client, id, data));
     },
   );
 }
