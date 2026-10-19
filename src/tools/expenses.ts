@@ -495,6 +495,9 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
       'Restore a soft-deleted Splitwise expense, then re-read it and return post_state {deleted_at, deleted_by, updated_at, updated_by}; if it is still (or again) deleted, the call fails naming who deleted it and when. This puts its charges back on every participant\'s balance and notifies them, so it is gated like the other writes.',
     // Destructive despite the delete tool being its record-level inverse:
     // the restore notifies every participant, and no later call un-sends that.
+    // Stated rather than left to registerWrite's default, because it is a
+    // decision about this tool, not a default it happens to share.
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     inputSchema: z.object({
       id: z.number().describe('Expense ID to restore'),
     }),
