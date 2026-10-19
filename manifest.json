@@ -176,6 +176,14 @@
     {
       "name": "sw_healthcheck",
       "description": "Verify credentials and Splitwise reachability: resolves the API key the way real tools do, makes one authenticated call, and reports whether a key resolved, whether Splitwise accepted it, and a hint telling those apart."
+    },
+    {
+      "name": "sw_confirm",
+      "description": "Confirm a previewed write with only its confirmToken (the server kept the arguments)"
+    },
+    {
+      "name": "sw_batch",
+      "description": "Run several expense/comment writes under one preview and one approval"
     }
   ],
   "compatibility": {

@@ -124,6 +124,8 @@ Add to Claude Desktop config:
 
 Every Splitwise write (creating, editing or deleting expenses, groups, friends, comments, or your profile) notifies other people, so it asks you to confirm first. A client that can show a confirmation prompt (Claude Code) shows one (unless `MCP_CONFIRM_ELICITATION=off`). On a client that cannot (claude.ai, Claude Desktop), the first call changes nothing and returns a preview of exactly what will be sent plus a `confirmToken`; only a repeat call with that token goes through, and the token is refused if anything in the request changed in between.
 
+To save calls on such a client: **`sw_confirm({confirmToken})`** finishes any previewed write with the token alone (the server kept the arguments, so a receipt's bytes are not sent a second time), and **`sw_batch({ops})`** previews and approves several expense/comment writes at once — e.g. create an expense, then comment on it and attach its receipt with `refs: {"expense_id": "0.expense_id"}`. A batch runs in order and stops at the first failure (no rollback; the result says what was applied).
+
 | variable | default | |
 |---|---|---|
 | `MCP_CONFIRM_MODE` | `ask-user` | What a write does on a client that cannot show a confirmation prompt (claude.ai, Claude Desktop). `ask-user`: two steps — the first call does nothing and returns a preview plus a token, and the model must get your approval in chat before calling again with it. `auto`: the same two steps, but the model may use the token after reviewing the preview itself. `refuse`: writes are refused on such clients. A client that can show prompts (Claude Code) always gets the real prompt, unless `MCP_CONFIRM_ELICITATION=off`. An unrecognised value is treated as `refuse`. |
@@ -133,7 +135,7 @@ Every Splitwise write (creating, editing or deleting expenses, groups, friends, 
 
 ## Available tools
 
-29 tools across 6 domains. All tools are prefixed `sw_`.
+31 tools across 6 domains. All tools are prefixed `sw_`.
 
 ### User
 
@@ -178,6 +180,13 @@ Every Splitwise write (creating, editing or deleting expenses, groups, friends, 
 | `sw_get_comments` | Get comments on an expense |
 | `sw_create_comment` | Add a comment to an expense |
 | `sw_delete_comment` | Delete a comment |
+
+### Confirming
+
+| Tool | What it does |
+|------|-------------|
+| `sw_confirm` | Finish a previewed write with only its `confirmToken` |
+| `sw_batch` | Several expense/comment writes under one preview and one approval; later ops can use an earlier op's new `expense_id` |
 
 ### Receipts
 

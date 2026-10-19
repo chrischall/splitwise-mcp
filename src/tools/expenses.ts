@@ -1,9 +1,15 @@
 import { z } from 'zod';
 import { EXPENSE_LIST_VIEWS, SW_VIEWS, viewExpense, viewExpenses } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/server';
-import { buildQueryString, minifiedResult, resolveView, viewParam } from '@chrischall/mcp-utils';
+import {
+  buildQueryString,
+  defineWrite,
+  minifiedResult,
+  registerWrite,
+  resolveView,
+  viewParam,
+} from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
-import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
 import { UNTRUSTED_DESCRIPTION_SUFFIX, swUntrustedResult } from './_untrusted.js';
 import {
   buildReceiptForm,
@@ -59,6 +65,20 @@ function commentNote(note: { truncated: boolean } | undefined) {
   return note?.truncated
     ? { comments_note: `Comments were inlined for the first ${MAX_COMMENT_ROWS} expenses that have any; narrow the filters or page with a smaller limit for the rest.` }
     : {};
+}
+
+/**
+ * One API key per SplitwiseClient (the hosted path builds a client per user),
+ * so there is no account switch inside a server to bind — said explicitly,
+ * as `confirmWrite` requires.
+ */
+const SINGLE_ACCOUNT = { account: undefined } as const;
+
+/** The id of the expense a create returned — what sw_batch feeds into a later op. */
+function createdExpenseId(result: unknown): number {
+  const id = (result as { expenses?: Array<{ id?: unknown }> } | null)?.expenses?.[0]?.id;
+  if (typeof id !== 'number') throw new Error('Splitwise returned no id for the created expense');
+  return id;
 }
 
 function buildExpenseBody(args: Record<string, unknown>): Record<string, unknown> {
@@ -265,56 +285,52 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     },
   );
 
-  server.registerTool(
-    'sw_create_expense',
-    {
-      description:
-        `Create a Splitwise expense. Splits: split_equally:true (you paid, everyone in the group owes an equal part); split:"equal" with paid_by (someone — e.g. the other parent — paid, split equally among split_among or the whole group); or a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. Pass category by name (or category_id); with neither, the most common category of similar expenses in the group is used and shown in the preview as inferred_category. The preview also lists possible_duplicates — expenses in the group, live or deleted, with the same cost, a similar description and a date within a day; check them before confirming. Pass receipt to attach an image or PDF in the same call. This puts charges on every participant's balance and notifies them. ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-      inputSchema: z.object({
-        group_id: z.number().describe('Group to add expense to (use 0 for no group)'),
-        description: z.string().describe('Short description of the expense'),
-        cost: z.string().describe('Total cost as decimal string, e.g. "25.00"'),
-        split_equally: z
-          .boolean()
-          .describe('Split equally among group members (mutually exclusive with users)')
-          .optional(),
-        users: z
-          .array(userShareSchema)
-          .describe(
-            'Custom split (mutually exclusive with split_equally). Full list of participants required.',
-          )
-          .optional(),
-        split: z
-          .literal('equal')
-          .describe('"equal": paid_by paid the whole cost and everyone in split_among owes an equal part (odd cents go to the first participants). Use instead of split_equally (which always makes YOU the payer) or users.')
-          .optional(),
-        paid_by: z
-          .union([z.number(), z.string().min(1)])
-          .describe('With split:"equal" — who paid: a user id, or a group member\'s name or email')
-          .optional(),
-        split_among: z
-          .array(z.union([z.number(), z.string().min(1)]))
-          .min(1)
-          .describe('With split:"equal" — who shares the cost (ids, names or emails). Default: every group member.')
-          .optional(),
-        currency_code: z
-          .string()
-          .describe('Currency code, e.g. "USD". Defaults to group/user default.')
-          .optional(),
-        date: z.string().describe('ISO 8601 datetime').optional(),
-        category_id: z.number().describe('Category id from sw_get_categories').optional(),
-        category: z
-          .string()
-          .min(1)
-          .describe('Category by name, e.g. "Education" or "Medical expenses" (any case). Mutually exclusive with category_id. Omit both and the most common category of similar expenses in the group is used.')
-          .optional(),
-        details: z.string().describe('Notes').optional(),
-        receipt: receiptParam,
-        confirmToken: confirmTokenParam,
-      }),
-    },
-    async (args, ctx) => {
+  registerWrite(server, defineWrite({
+    name: 'sw_create_expense',
+    description:
+      `Create a Splitwise expense. Splits: split_equally:true (you paid, everyone in the group owes an equal part); split:"equal" with paid_by (someone — e.g. the other parent — paid, split equally among split_among or the whole group); or a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. Pass category by name (or category_id); with neither, the most common category of similar expenses in the group is used and shown in the preview as inferred_category. The preview also lists possible_duplicates — expenses in the group, live or deleted, with the same cost, a similar description and a date within a day; check them before confirming. Pass receipt to attach an image or PDF in the same call. This puts charges on every participant's balance and notifies them. In sw_batch it produces expense_id.`,
+    inputSchema: z.object({
+      group_id: z.number().describe('Group to add expense to (use 0 for no group)'),
+      description: z.string().describe('Short description of the expense'),
+      cost: z.string().describe('Total cost as decimal string, e.g. "25.00"'),
+      split_equally: z
+        .boolean()
+        .describe('Split equally among group members (mutually exclusive with users)')
+        .optional(),
+      users: z
+        .array(userShareSchema)
+        .describe(
+          'Custom split (mutually exclusive with split_equally). Full list of participants required.',
+        )
+        .optional(),
+      split: z
+        .literal('equal')
+        .describe('"equal": paid_by paid the whole cost and everyone in split_among owes an equal part (odd cents go to the first participants). Use instead of split_equally (which always makes YOU the payer) or users.')
+        .optional(),
+      paid_by: z
+        .union([z.number(), z.string().min(1)])
+        .describe('With split:"equal" — who paid: a user id, or a group member\'s name or email')
+        .optional(),
+      split_among: z
+        .array(z.union([z.number(), z.string().min(1)]))
+        .min(1)
+        .describe('With split:"equal" — who shares the cost (ids, names or emails). Default: every group member.')
+        .optional(),
+      currency_code: z
+        .string()
+        .describe('Currency code, e.g. "USD". Defaults to group/user default.')
+        .optional(),
+      date: z.string().describe('ISO 8601 datetime').optional(),
+      category_id: z.number().describe('Category id from sw_get_categories').optional(),
+      category: z
+        .string()
+        .min(1)
+        .describe('Category by name, e.g. "Education" or "Medical expenses" (any case). Mutually exclusive with category_id. Omit both and the most common category of similar expenses in the group is used.')
+        .optional(),
+      details: z.string().describe('Notes').optional(),
+      receipt: receiptParam,
+    }),
+    plan: async (args) => {
       if (args.category !== undefined && args.category_id !== undefined) {
         throw new Error('Provide either category or category_id, not both');
       }
@@ -352,168 +368,147 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
           : [];
       if (duplicates.length > 0) extra.possible_duplicates = duplicates;
 
-      const gate = await confirmWrite(ctx, {
-        tool: 'sw_create_expense',
-        action: 'expense.create',
-        summary:
-          `Create a Splitwise expense "${args.description}" (${args.cost})${receipt ? ` with receipt ${receipt.filename}` : ''} — notifies group members` +
-          (duplicates.length > 0
-            ? ` — WARNING: ${duplicates.length} possible duplicate${duplicates.length > 1 ? 's' : ''} already in the group (see possible_duplicates)`
-            : ''),
-        method: 'POST',
-        path: '/create_expense',
-        body: previewBody(body, receipt),
-        target: args.group_id,
-        confirmToken: args.confirmToken,
-        args,
-        extra,
-      });
-      if (gate) return gate;
-      const data = await sendExpenseWrite(client, '/create_expense', body, receipt);
-      return minifiedResult(withPostState(data));
+      return {
+        gate: {
+          action: 'expense.create',
+          summary:
+            `Create a Splitwise expense "${args.description}" (${args.cost})${receipt ? ` with receipt ${receipt.filename}` : ''} — notifies group members` +
+            (duplicates.length > 0
+              ? ` — WARNING: ${duplicates.length} possible duplicate${duplicates.length > 1 ? 's' : ''} already in the group (see possible_duplicates)`
+              : ''),
+          ...SINGLE_ACCOUNT,
+          target: args.group_id,
+          request: { method: 'POST', path: '/create_expense', body: previewBody(body, receipt) },
+          preview: extra,
+        },
+        state: { body, receipt },
+      };
     },
-  );
+    execute: async ({ body, receipt }) =>
+      withPostState(await sendExpenseWrite(client, '/create_expense', body, receipt)),
+    render: minifiedResult,
+    produces: { expense_id: (result) => createdExpenseId(result) },
+  }));
 
-  server.registerTool(
-    'sw_update_expense',
-    {
-      description:
-        `Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split). To attach or replace the receipt on an existing expense, pass expense_id and receipt alone. ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-      inputSchema: z.object({
-        expense_id: z.number().describe('ID of the expense to update'),
-        description: z.string().optional(),
-        cost: z.string().describe('Decimal string, e.g. "25.00"').optional(),
-        split_equally: z.boolean().describe('Mutually exclusive with users').optional(),
-        users: z
-          .array(userShareSchema)
-          .describe(
-            'Full replacement split — all users must be included. Mutually exclusive with split_equally.',
-          )
-          .optional(),
-        currency_code: z.string().optional(),
-        date: z.string().optional(),
-        category_id: z.number().optional(),
-        details: z.string().optional(),
-        receipt: receiptParam,
-        confirmToken: confirmTokenParam,
-      }),
-    },
-    async (args, ctx) => {
+  registerWrite(server, defineWrite({
+    name: 'sw_update_expense',
+    description:
+      'Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split). To attach or replace the receipt on an existing expense, pass expense_id and receipt alone.',
+    inputSchema: z.object({
+      expense_id: z.number().describe('ID of the expense to update'),
+      description: z.string().optional(),
+      cost: z.string().describe('Decimal string, e.g. "25.00"').optional(),
+      split_equally: z.boolean().describe('Mutually exclusive with users').optional(),
+      users: z
+        .array(userShareSchema)
+        .describe(
+          'Full replacement split — all users must be included. Mutually exclusive with split_equally.',
+        )
+        .optional(),
+      currency_code: z.string().optional(),
+      date: z.string().optional(),
+      category_id: z.number().optional(),
+      details: z.string().optional(),
+      receipt: receiptParam,
+    }),
+    plan: async (args) => {
       const { expense_id } = args;
       const body = buildExpenseBody(args as Record<string, unknown>);
       const receipt = args.receipt ? await loadReceipt(args.receipt, client) : undefined;
       await assertNotDeleted(client, expense_id);
-      const gate = await confirmWrite(ctx, {
-        tool: 'sw_update_expense',
-        action: 'expense.update',
-        summary: `Update Splitwise expense ${expense_id}${receipt ? ` (attach receipt ${receipt.filename})` : ''} — notifies group members`,
-        method: 'POST',
-        path: `/update_expense/${expense_id}`,
-        body: previewBody(body, receipt),
-        target: expense_id,
-        confirmToken: args.confirmToken,
-        args,
-      });
-      if (gate) return gate;
-      const data = await explainForbidden(client, expense_id, () =>
-        sendExpenseWrite(client, `/update_expense/${expense_id}`, body, receipt, expense_id),
-      );
-      return minifiedResult(withPostState(data));
+      return {
+        gate: {
+          action: 'expense.update',
+          summary: `Update Splitwise expense ${expense_id}${receipt ? ` (attach receipt ${receipt.filename})` : ''} — notifies group members`,
+          ...SINGLE_ACCOUNT,
+          target: expense_id,
+          request: { method: 'POST', path: `/update_expense/${expense_id}`, body: previewBody(body, receipt) },
+        },
+        state: { expense_id, body, receipt },
+      };
     },
-  );
+    execute: async ({ expense_id, body, receipt }) =>
+      withPostState(
+        await explainForbidden(client, expense_id, () =>
+          sendExpenseWrite(client, `/update_expense/${expense_id}`, body, receipt, expense_id),
+        ),
+      ),
+    render: minifiedResult,
+  }));
 
-  server.registerTool(
-    'sw_attach_receipt',
-    {
-      description:
-        `Attach (or replace) the receipt image or PDF on an existing Splitwise expense. Changes nothing else on the expense — cost, split and description are not sent. Pass the file as receipt.upload_id (hosted: upload it first via sw_get_upload_url — no bytes in the tool call), receipt.path (local) or receipt.base64. Fails if Splitwise does not store the file. ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
-      inputSchema: z.object({
-        expense_id: z.number().describe('ID of the expense to attach the receipt to'),
-        receipt: receiptSchema,
-        confirmToken: confirmTokenParam,
-      }),
-    },
-    async (args, ctx) => {
+  registerWrite(server, defineWrite({
+    name: 'sw_attach_receipt',
+    description:
+      'Attach (or replace) the receipt image or PDF on an existing Splitwise expense. Changes nothing else on the expense — cost, split and description are not sent. Pass the file as receipt.upload_id (hosted: upload it first via sw_get_upload_url — no bytes in the tool call), receipt.path (local) or receipt.base64. Fails if Splitwise does not store the file.',
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+    inputSchema: z.object({
+      expense_id: z.number().describe('ID of the expense to attach the receipt to'),
+      receipt: receiptSchema,
+    }),
+    plan: async (args) => {
       const { expense_id } = args;
       const receipt = await loadReceipt(args.receipt, client);
-      const path = `/update_expense/${expense_id}`;
       await assertNotDeleted(client, expense_id);
-      const gate = await confirmWrite(ctx, {
-        tool: 'sw_attach_receipt',
-        action: 'expense.attach_receipt',
-        summary: `Attach receipt ${receipt.filename} to Splitwise expense ${expense_id} (replaces any existing receipt)`,
-        method: 'POST',
-        path,
-        body: previewBody({}, receipt),
-        target: expense_id,
-        confirmToken: args.confirmToken,
-        args,
-      });
-      if (gate) return gate;
-      const data = await explainForbidden(client, expense_id, () => sendExpenseWrite(client, path, {}, receipt, expense_id));
-      return minifiedResult(withPostState(data));
+      return {
+        gate: {
+          action: 'expense.attach_receipt',
+          summary: `Attach receipt ${receipt.filename} to Splitwise expense ${expense_id} (replaces any existing receipt)`,
+          ...SINGLE_ACCOUNT,
+          target: expense_id,
+          request: { method: 'POST', path: `/update_expense/${expense_id}`, body: previewBody({}, receipt) },
+        },
+        state: { expense_id, receipt },
+      };
     },
-  );
+    execute: async ({ expense_id, receipt }) =>
+      withPostState(
+        await explainForbidden(client, expense_id, () =>
+          sendExpenseWrite(client, `/update_expense/${expense_id}`, {}, receipt, expense_id),
+        ),
+      ),
+    render: minifiedResult,
+  }));
 
-  server.registerTool(
-    'sw_delete_expense',
-    {
-      description:
-        `Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore. ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-      inputSchema: z.object({
-        id: z.number().describe('Expense ID to delete'),
-        confirmToken: confirmTokenParam,
-      }),
-    },
-    async (args, ctx) => {
-      const { id, confirmToken } = args;
-      const gate = await confirmWrite(ctx, {
-        tool: 'sw_delete_expense',
+  registerWrite(server, defineWrite({
+    name: 'sw_delete_expense',
+    description: 'Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore.',
+    inputSchema: z.object({
+      id: z.number().describe('Expense ID to delete'),
+    }),
+    plan: ({ id }) => ({
+      gate: {
         action: 'expense.delete',
         summary: `Soft-delete Splitwise expense ${id}`,
-        method: 'POST',
-        path: `/delete_expense/${id}`,
+        ...SINGLE_ACCOUNT,
         target: id,
-        confirmToken,
-        args,
-      });
-      if (gate) return gate;
-      const data = await client.request('POST', `/delete_expense/${id}`);
-      return minifiedResult(data);
-    },
-  );
+        request: { method: 'POST', path: `/delete_expense/${id}` },
+      },
+      state: id,
+    }),
+    execute: (id) => client.request('POST', `/delete_expense/${id}`),
+    render: minifiedResult,
+  }));
 
-  server.registerTool(
-    'sw_undelete_expense',
-    {
-      description:
-        `Restore a soft-deleted Splitwise expense, then re-read it and return post_state {deleted_at, deleted_by, updated_at, updated_by}; if it is still (or again) deleted, the call fails naming who deleted it and when. This puts its charges back on every participant's balance and notifies them, so it is gated like the other writes. ${CONFIRM_NOTE}`,
-      // Destructive despite the delete tool being its record-level inverse:
-      // the restore notifies every participant, and no later call un-sends that.
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-      inputSchema: z.object({
-        id: z.number().describe('Expense ID to restore'),
-        confirmToken: confirmTokenParam,
-      }),
-    },
-    async (args, ctx) => {
-      const { id, confirmToken } = args;
-      const gate = await confirmWrite(ctx, {
-        tool: 'sw_undelete_expense',
+  registerWrite(server, defineWrite({
+    name: 'sw_undelete_expense',
+    description:
+      'Restore a soft-deleted Splitwise expense, then re-read it and return post_state {deleted_at, deleted_by, updated_at, updated_by}; if it is still (or again) deleted, the call fails naming who deleted it and when. This puts its charges back on every participant\'s balance and notifies them, so it is gated like the other writes.',
+    // Destructive despite the delete tool being its record-level inverse:
+    // the restore notifies every participant, and no later call un-sends that.
+    inputSchema: z.object({
+      id: z.number().describe('Expense ID to restore'),
+    }),
+    plan: ({ id }) => ({
+      gate: {
         action: 'expense.undelete',
         summary: `Restore soft-deleted Splitwise expense ${id} — puts it back on balances and notifies its participants`,
-        method: 'POST',
-        path: `/undelete_expense/${id}`,
+        ...SINGLE_ACCOUNT,
         target: id,
-        confirmToken,
-        args,
-      });
-      if (gate) return gate;
-      const data = await client.request('POST', `/undelete_expense/${id}`);
-      return minifiedResult(await verifyRestored(client, id, data));
-    },
-  );
+        request: { method: 'POST', path: `/undelete_expense/${id}` },
+      },
+      state: id,
+    }),
+    execute: async (id) => verifyRestored(client, id, await client.request('POST', `/undelete_expense/${id}`)),
+    render: minifiedResult,
+  }));
 }

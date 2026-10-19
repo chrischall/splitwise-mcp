@@ -1,9 +1,15 @@
 import { z } from 'zod';
 import { SW_VIEWS, viewGeneric } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/server';
-import { buildQueryString, minifiedResult, resolveView, viewParam } from '@chrischall/mcp-utils';
+import {
+  buildQueryString,
+  defineWrite,
+  minifiedResult,
+  registerWrite,
+  resolveView,
+  viewParam,
+} from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
-import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
 import { UNTRUSTED_DESCRIPTION_SUFFIX, swUntrustedResult } from './_untrusted.js';
 import { assertNotDeleted, explainForbidden } from './_expense-state.js';
 
@@ -71,66 +77,50 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     },
   );
 
-  server.registerTool(
-    'sw_create_comment',
-    {
-      description:
-        `Add a comment to a Splitwise expense (visible to other participants). Refused up front, naming who deleted it, if the expense is deleted — restore it with sw_undelete_expense first. ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-      inputSchema: z.object({
-        expense_id: z.number().describe('Expense ID to comment on'),
-        content: z.string().describe('Comment text'),
-        confirmToken: confirmTokenParam,
-      }),
-    },
-    async (args, ctx) => {
-      const { expense_id, content, confirmToken } = args;
+  registerWrite(server, defineWrite({
+    name: 'sw_create_comment',
+    description:
+      'Add a comment to a Splitwise expense (visible to other participants). Refused up front, naming who deleted it, if the expense is deleted — restore it with sw_undelete_expense first.',
+    inputSchema: z.object({
+      expense_id: z.number().describe('Expense ID to comment on'),
+      content: z.string().describe('Comment text'),
+    }),
+    plan: async ({ expense_id, content }) => {
       await assertNotDeleted(client, expense_id);
-      const gate = await confirmWrite(ctx, {
-        tool: 'sw_create_comment',
-        action: 'comment.create',
-        summary: `Comment on Splitwise expense ${expense_id} (visible to participants)`,
-        method: 'POST',
-        path: '/create_comment',
-        body: { expense_id, content },
-        target: expense_id,
-        confirmToken,
-        args,
-      });
-      if (gate) return gate;
-      const data = await explainForbidden(client, expense_id, () =>
-        client.request('POST', '/create_comment', { expense_id, content }),
-      );
-      return minifiedResult(data);
+      return {
+        gate: {
+          action: 'comment.create',
+          summary: `Comment on Splitwise expense ${expense_id} (visible to participants)`,
+          // One API key per client: no account switch inside a server to bind.
+          account: undefined,
+          target: expense_id,
+          request: { method: 'POST', path: '/create_comment', body: { expense_id, content } },
+        },
+        state: { expense_id, content },
+      };
     },
-  );
+    execute: ({ expense_id, content }) =>
+      explainForbidden(client, expense_id, () => client.request('POST', '/create_comment', { expense_id, content })),
+    render: minifiedResult,
+  }));
 
-  server.registerTool(
-    'sw_delete_comment',
-    {
-      description:
-        `Delete a comment by id. ${CONFIRM_NOTE}`,
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
-      inputSchema: z.object({
-        id: z.number().describe('Comment ID to delete'),
-        confirmToken: confirmTokenParam,
-      }),
-    },
-    async (args, ctx) => {
-      const { id, confirmToken } = args;
-      const gate = await confirmWrite(ctx, {
-        tool: 'sw_delete_comment',
+  registerWrite(server, defineWrite({
+    name: 'sw_delete_comment',
+    description: 'Delete a comment by id.',
+    inputSchema: z.object({
+      id: z.number().describe('Comment ID to delete'),
+    }),
+    plan: ({ id }) => ({
+      gate: {
         action: 'comment.delete',
         summary: `Delete Splitwise comment ${id}`,
-        method: 'POST',
-        path: `/delete_comment/${id}`,
+        account: undefined,
         target: id,
-        confirmToken,
-        args,
-      });
-      if (gate) return gate;
-      const data = await client.request('POST', `/delete_comment/${id}`);
-      return minifiedResult(data);
-    },
-  );
+        request: { method: 'POST', path: `/delete_comment/${id}` },
+      },
+      state: id,
+    }),
+    execute: (id) => client.request('POST', `/delete_comment/${id}`),
+    render: minifiedResult,
+  }));
 }
