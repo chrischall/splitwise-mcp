@@ -43,12 +43,19 @@ describe('confirmWrite bindings', () => {
     expect(mockRequest).not.toHaveBeenCalled();
   });
 
-  it('binds the full argument object for a destructured-args tool', async () => {
+  // The expense writes go through mcp-utils' registerWrite → confirmWrite,
+  // which binds the arguments inside the library (no confirmationFromEnv call
+  // to intercept here), so the binding is checked by its effect.
+  it('binds the full argument object on a registerWrite tool: a token for one call never acts on another', async () => {
+    const { parseToolResult } = await import('../helpers.js');
     const harness = await createTestHarness((server) => registerExpenseTools(server, client));
-    await harness.callTool('sw_delete_expense', { id: 42 });
+    const first = parseToolResult<{ confirmToken: string }>(await harness.callTool('sw_delete_expense', { id: 42 }));
+    const other = await harness.callTool('sw_delete_expense', { id: 43, confirmToken: first.confirmToken });
+    expect(other.isError).toBe(true);
+    expect(mockRequest).not.toHaveBeenCalled();
+    const same = await harness.callTool('sw_delete_expense', { id: 42, confirmToken: first.confirmToken });
+    expect(same.isError).toBeFalsy();
+    expect(mockRequest).toHaveBeenCalledWith('POST', '/delete_expense/42');
     await harness.close();
-
-    expect(seen).toHaveLength(1);
-    expect(seen[0].args).toEqual({ id: 42 });
   });
 });

@@ -11,6 +11,7 @@ import { registerExpenseTools } from '../src/tools/expenses.js';
 import { registerReceiptTools } from '../src/tools/receipts.js';
 import { registerUtilityTools } from '../src/tools/utilities.js';
 import { registerUploadTools } from '../src/tools/uploads.js';
+import { registerBatchTools } from '../src/tools/batch.js';
 import { createTestHarness } from './helpers.js';
 
 // Verify the tool registry covers all expected tools.
@@ -28,6 +29,7 @@ const expected = [
   'sw_undelete_expense', 'sw_attach_receipt', 'sw_get_receipt', 'sw_get_upload_url',
   'sw_get_notifications', 'sw_get_categories', 'sw_get_currencies',
   'sw_get_comments', 'sw_create_comment', 'sw_delete_comment',
+  'sw_confirm', 'sw_batch',
 ];
 
 describe('tool registry', () => {
@@ -44,6 +46,7 @@ describe('tool registry', () => {
       registerUtilityTools(server, client);
       registerUploadTools(server, client);
       registerHealthcheckTools(server, client);
+      registerBatchTools(server, client);
     });
     registered = (await harness.listTools()).map((t) => t.name);
   });
@@ -90,6 +93,8 @@ describe('tool registry', () => {
     sw_get_receipt: false,
     sw_create_comment: true,
     sw_delete_comment: true,
+    sw_confirm: true,
+    sw_batch: true,
   };
 
   it('annotates every tool with explicit, consistent hints', async () => {

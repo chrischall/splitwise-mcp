@@ -8,6 +8,7 @@ import { registerFriendTools } from './tools/friends.js';
 import { registerExpenseTools } from './tools/expenses.js';
 import { registerReceiptTools } from './tools/receipts.js';
 import { registerUploadTools } from './tools/uploads.js';
+import { registerBatchTools } from './tools/batch.js';
 import { registerUtilityTools } from './tools/utilities.js';
 
 // runMcp builds the McpServer, applies the registrars (threading `client`
@@ -34,5 +35,7 @@ await runMcp({
     registerReceiptTools,
     registerUploadTools,
     registerUtilityTools,
+    // Last: sw_batch lists the writes registered before it.
+    registerBatchTools,
   ],
 });

@@ -1,6 +1,6 @@
 # splitwise-mcp
 
-MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 29 tools to Claude over stdio. Built on `@chrischall/mcp-utils` (`runMcp`, `createApiClient`, `readEnvVar`, `textResult`).
+MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 31 tools to Claude over stdio. Built on `@chrischall/mcp-utils` (`runMcp`, `createApiClient`, `readEnvVar`, `textResult`).
 
 ## Commands
 
@@ -54,10 +54,14 @@ src/
                   #   buildReceiptForm, verifyReceiptStored
     utilities.ts  # sw_get_notifications, sw_get_categories, sw_get_currencies,
                   #   sw_get_comments, sw_create_comment, sw_delete_comment
-    _confirm.ts   # confirmWrite(): the confirmation gate every write goes through
+    _confirm.ts   # confirmWrite(): the gate for the group/friend/user writes
+    batch.ts      # sw_confirm (registerConfirmTool) + sw_batch (registerBatchTool),
+                  #   registered LAST — sw_batch lists the writes before it
 ```
 
 Every write (the two undeletes included — a restore puts charges back on other people's balances) is gated by `confirmWrite(ctx, …)` from `src/tools/_confirm.ts` (Splitwise writes notify other people). A client that can show a prompt is asked (unless `MCP_CONFIRM_ELICITATION=off`); one that cannot gets the two-step token flow (`MCP_CONFIRM_MODE`): the first call does nothing and returns a preview (`action`, `method`, `path`, `willSend`) plus a `confirmToken` bound to exactly that request, and only a repeat call with the token writes. Validation (e.g. `split_equally` vs `users`) runs BEFORE the gate, so a bad request is refused on the first call. A new write tool takes `confirmToken: confirmTokenParam`, ends its description with `CONFIRM_NOTE`, and calls `confirmWrite` before the request.
+
+The expense and comment writes (`sw_create_expense`, `sw_update_expense`, `sw_attach_receipt`, `sw_delete_expense`, `sw_undelete_expense`, `sw_create_comment`, `sw_delete_comment`) are `defineWrite` definitions registered with mcp-utils' `registerWrite`: `plan` (validation + pre-flight reads + gate fields, no side effects) and `execute` (the write). That split is what lets `sw_batch` run them under one gate; `sw_create_expense` `produces` `expense_id` for later ops. Every gated tool — these and the `_confirm.ts` ones — is confirmable with `sw_confirm({confirmToken})`, which replays the phase-1 arguments mcp-utils kept in memory through the tool's own gate (mcp-utils `docs/CONFIRM-TOKEN.md` §13–14).
 
 Each tool file exports a `register<Domain>Tools(server, client)` function that calls `server.registerTool(name, { description, annotations, inputSchema }, handler)` (high-level `McpServer` API with zod schemas). The `SplitwiseClient` is INJECTED as the second argument rather than imported as a module singleton — a hosted per-user deployment builds one client per authenticated user, which a singleton cannot express. `index.ts` passes the register functions to `runMcp`, which builds the `McpServer`, calls each, and connects the stdio transport.
 
