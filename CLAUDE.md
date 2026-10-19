@@ -1,6 +1,6 @@
 # splitwise-mcp
 
-MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 28 tools to Claude over stdio. Built on `@chrischall/mcp-utils` (`runMcp`, `createApiClient`, `readEnvVar`, `textResult`).
+MCP server for Splitwise. Wraps the Splitwise REST API (`https://secure.splitwise.com/api/v3.0`) and exposes 29 tools to Claude over stdio. Built on `@chrischall/mcp-utils` (`runMcp`, `createApiClient`, `readEnvVar`, `textResult`).
 
 ## Commands
 
@@ -38,10 +38,19 @@ src/
     expenses.ts   # sw_list_expenses, sw_get_expense, sw_create_expense,
                   #   sw_update_expense, sw_attach_receipt, sw_delete_expense,
                   #   sw_undelete_expense
+    _list.ts      # sw_list_expenses' local filters, cursor scan (200/page,
+                  #   1000-record budget), rows view, inline comments
+    _create.ts    # create pre-flight: category by name (cached), category
+                  #   inference, duplicate scan, split:"equal" resolution
+    _split.ts     # equalSplit (minor-unit arithmetic) + resolveMember
+    _expense-state.ts # deleted-expense pre-check, 403 explanation,
+                  #   post_state, undelete verification
+    uploads.ts    # sw_get_upload_url — signed PUT on mcp-host's blob store
+    _blob.ts      # blob-store signing (gateway payload shapes, byte for byte)
     receipts.ts   # sw_get_receipt — authenticated receipt download,
                   #   inline bytes, and PDF text extraction
-    _receipt.ts   # receipt UPLOAD for create/update/attach: loadReceipt (base64 |
-                  #   sandboxed path, magic-byte type check, 10 MiB cap),
+    _receipt.ts   # receipt UPLOAD for create/update/attach: loadReceipt (upload_id |
+                  #   sandboxed path | base64, magic-byte type check, 10 MiB cap),
                   #   buildReceiptForm, verifyReceiptStored
     utilities.ts  # sw_get_notifications, sw_get_categories, sw_get_currencies,
                   #   sw_get_comments, sw_create_comment, sw_delete_comment
@@ -137,6 +146,8 @@ write-verification, transport archetypes, testing traps) live in
 - **Receipts must not depend on the filesystem**: `sw_get_receipt`'s file write is *best effort*. A hosted deployment runs from a read-only npm cache, so an unconditional write fails the whole call (`EACCES` on `<cache>/node_modules/splitwise-mcp/...`) and the caller — whose sandbox is a different filesystem anyway — can never read the path. The write is wrapped: on failure the tool reports `write_error` and still returns whatever content was asked for, and it only throws when nothing at all reached the caller (no file, no `inline`, no `text`) — with an error naming `inline:true` / `extract_text:true` as the way out. `inline` covers every type: an image block for images, an MCP embedded resource (`{type:'resource', resource:{uri, mimeType, blob}}`) for PDFs and anything else.
 - **`unpdf` is lazily imported**: `extract_text` pulls a full pdf.js build (~2.4 MB in `dist/bundle.js`). It's behind `await import('unpdf')` inside the handler so no other receipt path — and no server startup — pays for it. `getDocumentProxy` detaches the buffer it's handed, so `extractPdfText` copies via `Uint8Array.from` first; without that copy the base64 and the file write would see an empty buffer.
 - **Receipt upload is multipart**: when `sw_create_expense` / `sw_update_expense` get a `receipt`, the whole expense is sent as multipart/form-data via `SplitwiseClient.requestMultipart` (Splitwise only accepts files that way); without one they stay JSON. The file is loaded and validated BEFORE the confirm gate, and the preview's `willSend.receipt` is `{filename, mime_type, bytes, sha256}` — never the bytes, so a token is bound to the exact file. After the write, `verifyReceiptStored` requires `expenses[0].receipt.original` — Splitwise can 200 with the file dropped, and that must be an error naming the expense, not a success.
+- **Pre-flight reads before the gate**: `sw_update_expense` / `sw_attach_receipt` / `sw_create_comment` read the expense first (refuse if deleted); `sw_create_expense` reads categories, recent group expenses (inference) and a ±1-day window (duplicates). All are advisory — a failed read never blocks the write — and everything they add to the preview is bound into the token. Tests count writes with `writes()` from `tests/helpers.ts`, which ignores GETs.
+- **`receipt.upload_id`** (hosted): `sw_get_upload_url` signs a PUT for `up/<uuid>/<name>` under `MCP_BLOB_BASE_URL` with `MCP_BLOB_SIGNING_KEY` (both injected by mcp-host; absent on stdio, where the tool explains the alternatives). `loadReceipt` reads it back with a signed GET via `fetchAsset` (anonymous — not a Splitwise host). Only keys matching `UPLOAD_ID_PATTERN` are readable.
 - **`receipt.path` is sandboxed**: it reads nothing unless `SPLITWISE_INPUT_DIR` is set (a hosted runner never sets it, so a caller can't make the server upload its own files). Dir and target are both `realpath`-resolved and the target must stay inside; the bytes are read from the handle that was `stat`ed.
 - **`manifest.json` tool list**: nothing generates it. `tests/index.test.ts` asserts it matches the registered tools — add new tools in both places.
 - **Plugin files**: `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json` are for Claude Code plugin distribution — not part of the MCP runtime.

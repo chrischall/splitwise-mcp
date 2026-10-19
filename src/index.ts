@@ -7,6 +7,7 @@ import { registerGroupTools } from './tools/groups.js';
 import { registerFriendTools } from './tools/friends.js';
 import { registerExpenseTools } from './tools/expenses.js';
 import { registerReceiptTools } from './tools/receipts.js';
+import { registerUploadTools } from './tools/uploads.js';
 import { registerUtilityTools } from './tools/utilities.js';
 
 // runMcp builds the McpServer, applies the registrars (threading `client`
@@ -31,6 +32,7 @@ await runMcp({
     registerFriendTools,
     registerExpenseTools,
     registerReceiptTools,
+    registerUploadTools,
     registerUtilityTools,
   ],
 });

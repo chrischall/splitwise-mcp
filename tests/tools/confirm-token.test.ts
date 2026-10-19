@@ -6,7 +6,7 @@ import { registerFriendTools } from '../../src/tools/friends.js';
 import { registerGroupTools } from '../../src/tools/groups.js';
 import { registerUserTools } from '../../src/tools/user.js';
 import { registerUtilityTools } from '../../src/tools/utilities.js';
-import { confirmedCall, createTestHarness, parseToolResult } from '../helpers.js';
+import { confirmedCall, createTestHarness, parseToolResult, writes } from '../helpers.js';
 
 // Every Splitwise write notifies other people, so every write is gated: a real
 // confirmation prompt where the client supports one, otherwise a two-step
@@ -162,7 +162,7 @@ describe('every write is gated (client without elicitation → token flow)', () 
     else expect(phase1.preview.willSend).toEqual(willSend);
 
     expect(result.isError).toBeFalsy();
-    expect(mockRequest).toHaveBeenCalledTimes(1);
+    expect(writes(mockRequest)).toBe(1);
     expect(mockRequest).toHaveBeenCalledWith(...write);
   });
 
@@ -190,7 +190,7 @@ describe('token refusals', () => {
     const replay = await harness.callTool('sw_delete_expense', { ...args, confirmToken: phase1.confirmToken });
     expect(replay.isError).toBe(true);
     expect(parseToolResult<{ error: string }>(replay).error).toBe('TOKEN_REUSED');
-    expect(mockRequest).not.toHaveBeenCalled();
+    expect(writes(mockRequest)).toBe(0);
   });
 
   it('changing an argument between the phases is refused as DRAFT_CHANGED and does not write', async () => {
@@ -208,7 +208,7 @@ describe('token refusals', () => {
     expect(body.error).toBe('DRAFT_CHANGED');
     // The refusal carries the CURRENT preview, so the user can re-approve what will really happen.
     expect(body.preview.willSend.cost).toBe('500.00');
-    expect(mockRequest).not.toHaveBeenCalled();
+    expect(writes(mockRequest)).toBe(0);
   });
 
   it('a token issued for one target does not act on another', async () => {
@@ -218,7 +218,7 @@ describe('token refusals', () => {
 
     const other = await harness.callTool('sw_delete_group', { id: 2, confirmToken });
     expect(other.isError).toBe(true);
-    expect(mockRequest).not.toHaveBeenCalled();
+    expect(writes(mockRequest)).toBe(0);
   });
 });
 
@@ -239,7 +239,7 @@ describe('clients that can show a confirmation prompt', () => {
     });
     const result = await harness.callTool('sw_delete_friend', { id: 7 });
     expect(parseToolResult<{ confirmed: boolean }>(result).confirmed).toBe(false);
-    expect(mockRequest).not.toHaveBeenCalled();
+    expect(writes(mockRequest)).toBe(0);
   });
 });
 
@@ -249,6 +249,6 @@ describe('MCP_CONFIRM_MODE=refuse', () => {
     harness = await createTestHarness(registerAll);
     const result = await harness.callTool('sw_create_comment', { expense_id: 55, content: 'hi' });
     expect(parseToolResult<{ reason: string }>(result).reason).toBe('confirmation-unsupported');
-    expect(mockRequest).not.toHaveBeenCalled();
+    expect(writes(mockRequest)).toBe(0);
   });
 });

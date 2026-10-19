@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { compactGroup, compactExpense, compactPerson, viewFriends, viewUser, viewGroups, viewExpenses, viewGeneric, PERSON_VIEW_NOTE, SW_VIEWS } from '../src/project.js';
+import { compactGroup, compactExpense, compactPerson, rowExpense, EXPENSE_LIST_VIEWS, viewFriends, viewUser, viewGroups, viewExpenses, viewGeneric, PERSON_VIEW_NOTE, SW_VIEWS } from '../src/project.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -186,12 +186,42 @@ describe('compactExpense', () => {
     // A receipt is evidence; sw_get_receipt is how a caller fetches it.
     expect(compactExpense(LIVE_EXPENSE).has_receipt).toBe(true);
     expect(JSON.stringify(compactExpense(LIVE_EXPENSE))).not.toContain('cachebust');
-    expect(compactExpense({ ...LIVE_EXPENSE, receipt: { large: null, original: null } })).not.toHaveProperty('has_receipt');
+    expect(compactExpense({ ...LIVE_EXPENSE, receipt: { large: null, original: null } }).has_receipt).toBe(false);
+  });
+
+  it('always states has_receipt, so "no receipt" is a fact rather than a missing key', () => {
+    expect(compactExpense({ ...LIVE_EXPENSE, receipt: undefined }).has_receipt).toBe(false);
+  });
+
+  it('names who last updated it, and who deleted it when deleted', () => {
+    expect(compactExpense(LIVE_EXPENSE).updated_by).toBe('Alison Hall');
+    expect(compactExpense(LIVE_EXPENSE)).not.toHaveProperty('deleted_by');
+    const deleted = { ...LIVE_EXPENSE, deleted_at: '2026-09-03T00:00:00Z', deleted_by: { id: 88065463, first_name: 'Chris', last_name: 'Hall' } };
+    expect(compactExpense(deleted)).toMatchObject({ deleted_at: '2026-09-03T00:00:00Z', deleted_by: 'Chris Hall' });
   });
 
   it('surfaces deleted_at when set, so a deleted expense is not silently counted', () => {
     expect(compactExpense(LIVE_EXPENSE)).not.toHaveProperty('deleted_at');
     expect(compactExpense({ ...LIVE_EXPENSE, deleted_at: '2026-09-03T00:00:00Z' }).deleted_at).toBe('2026-09-03T00:00:00Z');
+  });
+});
+
+describe('rowExpense', () => {
+  it('is the reconciliation row: exactly these keys', () => {
+    expect(rowExpense(LIVE_EXPENSE)).toEqual({
+      id: 4666326570, date: '2026-09-02T22:37:44Z', description: 'Eriks new shoes',
+      cost: '61.14', currency_code: 'USD', category: 'Clothing', created_by: 'Alison Hall',
+      comments_count: 0, has_receipt: true,
+    });
+  });
+
+  it('carries deleted_at and deleted_by on a deleted row', () => {
+    const deleted = { ...LIVE_EXPENSE, deleted_at: '2026-09-03T00:00:00Z', deleted_by: { first_name: 'Chris', last_name: 'Hall' } };
+    expect(rowExpense(deleted)).toMatchObject({ deleted_at: '2026-09-03T00:00:00Z', deleted_by: 'Chris Hall' });
+  });
+
+  it('is offered as a third rung on the expense list only', () => {
+    expect(EXPENSE_LIST_VIEWS).toEqual(['compact', 'full', 'rows']);
   });
 });
 

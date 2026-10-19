@@ -146,6 +146,10 @@
       "description": "Download an expense receipt (inline bytes, PDF text, or a file)"
     },
     {
+      "name": "sw_get_upload_url",
+      "description": "Get a short-lived signed URL to upload a receipt file (hosted server) and reference it as receipt.upload_id"
+    },
+    {
       "name": "sw_get_comments",
       "description": "Get comments on an expense"
     },

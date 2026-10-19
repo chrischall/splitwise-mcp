@@ -90,18 +90,19 @@ API key auth — no login flow or token rotation. The key is attached to every r
 ### Expenses
 | Tool | Description |
 |------|-------------|
-| `sw_list_expenses(group_id?, friend_id?, dated_after?, dated_before?, limit?, offset?, view?)` | List or search expenses |
-| `sw_get_expense(id, view?)` | Get full details of a single expense |
-| `sw_create_expense(group_id, description, cost, split_equally? \| users?, receipt?)` | Create an expense — equal split or custom per-person split; `receipt` attaches an image/PDF in the same call |
-| `sw_update_expense(expense_id, ..., receipt?)` | Edit an existing expense (custom split requires full `users` array). `expense_id` + `receipt` alone attaches or replaces the receipt |
+| `sw_list_expenses(group_id?, friend_id?, dated_after?, dated_before?, description_contains?, include_deleted?, created_by?, min_cost?, max_cost?, category?, include_comments?, cursor?, limit?, offset?, view?)` | List or search expenses. The local filters page through history (≤1000 records per call) and return up to `limit` matches plus `next_cursor`. `view: "rows"` = one flat line per expense (id, date, description, cost, created_by, deleted_at, deleted_by, comments_count, has_receipt) |
+| `sw_get_expense(id, view?)` | Get full details of a single expense; compact includes `deleted_by`, `updated_by`, `has_receipt` |
+| `sw_create_expense(group_id, description, cost, split_equally? \| split:"equal"+paid_by+split_among? \| users?, category? \| category_id?, receipt?)` | Create an expense. `split:"equal"` + `paid_by` (id, name or email) when someone else paid; odd cents go to the first participant. `category` by name; with no category, the group's most common category for similar descriptions is used (`inferred_category` in the preview). The preview lists `possible_duplicates` (same cost, similar description, ±1 day, live or deleted) |
+| `sw_update_expense(expense_id, ..., receipt?)` | Edit an existing expense (custom split requires full `users` array). `expense_id` + `receipt` alone attaches or replaces the receipt. Refused up front, naming who deleted it, on a deleted expense |
 | `sw_delete_expense(id)` | Soft-delete an expense |
-| `sw_undelete_expense(id)` | Restore a soft-deleted expense |
+| `sw_undelete_expense(id)` | Restore a soft-deleted expense and re-read it: returns `post_state`; errors naming who/when if it is still (or again) deleted |
 | `sw_attach_receipt(expense_id, receipt)` | Attach or replace the receipt on an existing expense; changes nothing else |
 
 ### Receipts
 | Tool | Description |
 |------|-------------|
 | `sw_get_receipt(id, size?, inline?, extract_text?, output_dir?, write?)` | Download the receipt attached to an expense. `inline: true` returns the bytes in the result (images **and** PDFs); `extract_text: true` returns a PDF's text layer; without either (or with `output_dir` / `write: true`) it writes the file and returns the path |
+| `sw_get_upload_url(filename, content_type)` | Hosted server only: a ~10-minute signed PUT URL plus a ready curl command. Upload the ORIGINAL file (no downsampling), then pass `receipt: {upload_id, filename}` |
 
 ### Utilities
 | Tool | Description |
@@ -214,7 +215,28 @@ sw_create_expense(group_id, "Band camp water jug", "54.11", split_equally: true,
 sw_attach_receipt(expense_id, receipt: { base64: "<png/jpeg/gif/pdf bytes>", filename: "order.pdf" })
 ```
 
-`receipt` takes `filename` plus exactly one of `base64` (the normal input) or `path` (only on a local server with `SPLITWISE_INPUT_DIR` set, and only inside that directory). PNG, JPEG, GIF or PDF, ≤ 10 MiB, type detected from the bytes. It replaces any existing receipt. Use `sw_attach_receipt` to add a file to an existing expense — it sends nothing but the file. If Splitwise saves the expense but drops the file, the tool returns an error naming the expense: do not re-create it, retry with `sw_attach_receipt`.
+`receipt` takes `filename` plus exactly one of `upload_id` (hosted server: from `sw_get_upload_url`, after `curl -X PUT` of the file — keeps the bytes out of the conversation and out of the second, confirming call), `path` (only on a local server with `SPLITWISE_INPUT_DIR` set, and only inside that directory) or `base64` (fallback when you have no shell that can reach the upload URL). PNG, JPEG, GIF or PDF, ≤ 10 MiB, type detected from the bytes. It replaces any existing receipt. Use `sw_attach_receipt` to add a file to an existing expense — it sends nothing but the file. If Splitwise saves the expense but drops the file, the tool returns an error naming the expense: do not re-create it, retry with `sw_attach_receipt`.
+
+**Log a 50/50 expense the other person paid:**
+```
+sw_create_expense(group_id, "Egan camp", "250.01", split: "equal", paid_by: "Alison")
+→ preview: users split 125.01 / 125.00, inferred_category, possible_duplicates (check these!)
+```
+
+**Upload a receipt on the hosted server (no base64):**
+```
+sw_get_upload_url(filename: "receipt.jpg", content_type: "image/jpeg")
+→ run the returned curl with the original file
+sw_attach_receipt(expense_id, receipt: { upload_id, filename: "receipt.jpg" })
+```
+
+**Reconcile a long history (incl. deleted entries and why):**
+```
+sw_list_expenses(group_id, description_contains: "egan", view: "rows",
+                 dated_after: "2026-01-01", include_comments: true)
+→ rows with deleted_at / deleted_by and inline comments; pass next_cursor for more
+sw_list_expenses(..., include_deleted: "only")  → just the deleted ones
+```
 
 **Get the receipt for an expense:**
 ```
@@ -237,9 +259,10 @@ sw_update_expense(expense_id, description: "Corrected description", cost: "95.00
 - `cost` is always a decimal string (e.g. `"25.00"`)
 - `split_equally: true` and `users` array are mutually exclusive
 - For custom split updates, the **full `users` array is required** — the API replaces the entire split
-- `sw_delete_expense` is a soft delete — restore with `sw_undelete_expense`
+- `sw_delete_expense` is a soft delete — restore with `sw_undelete_expense`, then check its `post_state`: in a shared group the other member can delete it again, and the tool reports that as an error naming them
+- Writes to a deleted expense (`sw_update_expense`, `sw_attach_receipt`, `sw_create_comment`) are refused before the preview with who deleted it and when — restore it first
 - The `receipt.original` / `receipt.large` URLs on an expense are **not public** — fetching them without the API key returns 401. Always use `sw_get_receipt`, which fetches them with the server's own credentials
 - `sw_get_receipt` writes into `output_dir`, else `$SPLITWISE_OUTPUT_DIR`, else `~/Downloads/splitwise-mcp` (never the working directory), owner-only (0600), and never overwrites an existing file; with `inline`/`extract_text` and no `output_dir` it writes nothing unless `write: true`
 - That path is on the **server's** filesystem. If you can't read it — a hosted or containerised server — use `inline: true` (bytes) or `extract_text: true` (PDF text) instead of the path
 - `extract_text` only works on PDFs, and only when the PDF has a text layer; a scanned or photographed receipt returns `text_note` instead, and needs `inline: true` to read
-- API default for `sw_list_expenses` is 20 results when `limit` is omitted; `limit` is 1-200 (there is no "all" — page with `offset`)
+- API default for `sw_list_expenses` is 20 results when `limit` is omitted; `limit` is 1-200 (there is no "all" — page with `next_cursor`, or `offset`)

@@ -22,6 +22,8 @@ Ask Claude things like:
 - *"Delete that duplicate expense"*
 - *"Download the receipt from that hotel expense"*
 - *"Add that Amazon order screenshot as the receipt on the water-jug expense"*
+- *"Log $250.01 camp, Alison paid, split 50/50"*
+- *"Find every 'egan' expense this year, including deleted ones, and why they were deleted"*
 
 ## Requirements
 
@@ -115,7 +117,8 @@ Add to Claude Desktop config:
 |---------|----------|-------|
 | `SPLITWISE_API_KEY` | Yes | API key from [splitwise.com/apps/register](https://secure.splitwise.com/apps/register) |
 | `SPLITWISE_OUTPUT_DIR` | No | Where `sw_get_receipt` writes downloaded receipts (owner-only, mode 0600). Defaults to `~/Downloads/splitwise-mcp`, never the working directory. When set, a per-call `output_dir` must be inside it. |
-| `SPLITWISE_INPUT_DIR` | No | The only directory `receipt.path` may read from (`..` and symlinks out of it are refused). Unset — always the case on a hosted server — means receipts are accepted as `base64` only. |
+| `SPLITWISE_INPUT_DIR` | No | The only directory `receipt.path` may read from (`..` and symlinks out of it are refused). Unset — always the case on a hosted server — means receipts are accepted as `upload_id` (hosted) or `base64` only. |
+| `MCP_BLOB_BASE_URL` / `MCP_BLOB_SIGNING_KEY` | No | Injected by [mcp-host](https://github.com/chrischall/mcp-host) on the hosted server; they turn on `sw_get_upload_url`. Not set locally. |
 
 ## Confirmations
 
@@ -130,7 +133,7 @@ Every Splitwise write (creating, editing or deleting expenses, groups, friends, 
 
 ## Available tools
 
-26 tools across 6 domains. All tools are prefixed `sw_`.
+29 tools across 6 domains. All tools are prefixed `sw_`.
 
 ### User
 
@@ -165,12 +168,12 @@ Every Splitwise write (creating, editing or deleting expenses, groups, friends, 
 
 | Tool | What it does |
 |------|-------------|
-| `sw_list_expenses` | List or search expenses with filters |
-| `sw_get_expense` | Full details of a single expense |
-| `sw_create_expense` | Create an expense (equal or custom split), optionally with a receipt image/PDF |
-| `sw_update_expense` | Edit an existing expense, or attach/replace its receipt |
+| `sw_list_expenses` | List or search expenses. Splitwise-side filters (group, friend, dates) plus `description_contains`, `include_deleted` (`true`/`false`/`"only"`), `created_by`, `min_cost`/`max_cost` and `category`, paged with `next_cursor`; `view: "rows"` for a one-line-per-expense reconciliation view and `include_comments: true` to see why entries were deleted |
+| `sw_get_expense` | Full details of a single expense (compact includes `deleted_by`, `updated_by` and `has_receipt`) |
+| `sw_create_expense` | Create an expense — `split_equally`, `split: "equal"` with `paid_by` (someone else paid), or a custom `users` split; `category` by name, or inferred from similar expenses; the preview warns of `possible_duplicates`; optional receipt |
+| `sw_update_expense` | Edit an existing expense, or attach/replace its receipt. Refused up front if the expense is deleted |
 | `sw_delete_expense` | Soft-delete an expense |
-| `sw_undelete_expense` | Restore a deleted expense |
+| `sw_undelete_expense` | Restore a deleted expense, then re-read it: returns `post_state`, and fails naming who re-deleted it if it is still deleted |
 | `sw_attach_receipt` | Attach or replace the receipt on an existing expense, changing nothing else |
 | `sw_get_comments` | Get comments on an expense |
 | `sw_create_comment` | Add a comment to an expense |
@@ -181,6 +184,7 @@ Every Splitwise write (creating, editing or deleting expenses, groups, friends, 
 | Tool | What it does |
 |------|-------------|
 | `sw_get_receipt` | Download an expense's receipt image/PDF with the server's credentials. Returns it inline (`inline`), as extracted PDF text (`extract_text`), and/or written to a file |
+| `sw_get_upload_url` | Hosted only: a short-lived signed URL to `curl -X PUT` a receipt file to, then pass `receipt: {upload_id, filename}` — no base64 through the conversation |
 
 ### Utilities
 

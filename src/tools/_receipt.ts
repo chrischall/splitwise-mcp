@@ -1,5 +1,7 @@
 import { createHash } from 'crypto';
-import { readEnvVar } from '@chrischall/mcp-utils';
+import { ApiError, readEnvVar } from '@chrischall/mcp-utils';
+import type { SplitwiseClient } from '../client.js';
+import { blobConfig, signedGetUrl, UPLOAD_ID_PATTERN } from './_blob.js';
 import { z } from 'zod';
 
 /**
@@ -26,14 +28,19 @@ export const receiptSchema = z
     base64: z
       .string()
       .min(1)
-      .describe('The file bytes, base64-encoded (a data: URL prefix is accepted and stripped). The normal way to pass a receipt.')
+      .describe('The file bytes, base64-encoded (a data: URL prefix is accepted and stripped). Costs context for every byte — on the hosted server prefer upload_id.')
       .optional(),
     path: z
       .string()
       .min(1)
       .describe(
-        'A file inside SPLITWISE_INPUT_DIR on the machine running this server (relative to it, or absolute). Only works when that variable is set — never on a hosted server; use base64 there.',
+        'A file inside SPLITWISE_INPUT_DIR on the machine running this server (relative to it, or absolute). Only works when that variable is set — never on a hosted server; use upload_id (or base64) there.',
       )
+      .optional(),
+    upload_id: z
+      .string()
+      .min(1)
+      .describe('The upload_id from sw_get_upload_url, after the file was PUT to its upload_url. The way to send a full-size file to the hosted server without base64.')
       .optional(),
     filename: z.string().min(1).max(200).describe('Name to store the file under, e.g. "receipt.pdf".'),
     mime_type: z
@@ -42,7 +49,7 @@ export const receiptSchema = z
       .optional(),
   })
   .describe(
-    `Receipt to attach: PNG, JPEG, GIF or PDF, up to ${LIMIT_LABEL}. Give exactly one of base64 or path. The type is detected from the file contents. Replaces any receipt already on the expense.`,
+    `Receipt to attach: PNG, JPEG, GIF or PDF, up to ${LIMIT_LABEL}. Give exactly one of upload_id, path or base64. The type is detected from the file contents. Replaces any receipt already on the expense.`,
   );
 
 export const receiptParam = receiptSchema.optional();
@@ -130,18 +137,65 @@ async function readSandboxed(requested: string): Promise<Uint8Array<ArrayBuffer>
   }
 }
 
+/** How long the server's own read link for an upload lives — it is used at once. */
+const UPLOAD_READ_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Read a file the caller PUT to a `sw_get_upload_url` link, through a signed
+ * GET on the same blob store. Only `up/<uuid>/<name>` keys are accepted.
+ */
+async function readUpload(uploadId: string, client: SplitwiseClient | undefined): Promise<Uint8Array<ArrayBuffer>> {
+  if (!UPLOAD_ID_PATTERN.test(uploadId)) {
+    throw new Error('receipt.upload_id is not one sw_get_upload_url issued (expected up/<uuid>/<filename>)');
+  }
+  const cfg = blobConfig();
+  if (!cfg || !client) {
+    throw new Error('receipt.upload_id only works on the hosted server; pass receipt.path or receipt.base64 here.');
+  }
+  try {
+    const asset = await client.fetchAsset(signedGetUrl(cfg, uploadId, Date.now() + UPLOAD_READ_TTL_MS), {
+      maxBytes: MAX_RECEIPT_BYTES,
+    });
+    return Uint8Array.from(asset.bytes);
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
+      throw new Error(
+        `No upload found for receipt.upload_id ${uploadId} — the PUT may not have run, failed, or the upload expired. Get a fresh link with sw_get_upload_url and upload the file again.`,
+      );
+    }
+    if ((err as { kind?: string }).kind === 'too_large') {
+      throw new Error(`The uploaded receipt is over the ${LIMIT_LABEL} limit (${MAX_RECEIPT_BYTES} bytes)`);
+    }
+    throw err;
+  }
+}
+
+/** The canonical MIME type for an upload, or an error naming the ones Splitwise takes. */
+export function canonicalReceiptMime(contentType: string): string {
+  const claimed = contentType.trim().toLowerCase();
+  const mime = MIME_ALIASES[claimed] ?? claimed;
+  if (!RECEIPT_TYPES.some((t) => t.mime === mime)) {
+    throw new Error(`content_type must be one of ${RECEIPT_TYPES.map((t) => t.mime).join(', ')} (got ${contentType})`);
+  }
+  return mime;
+}
+
 /**
  * Read and validate a receipt before the confirmation gate, so a bad file is
  * refused on the first call and the preview can name exactly what will be sent.
  */
-export async function loadReceipt(input: ReceiptInput): Promise<LoadedReceipt> {
-  const hasPath = input.path !== undefined;
-  const hasBase64 = input.base64 !== undefined;
-  if (hasPath === hasBase64) {
-    throw new Error('receipt needs exactly one of path or base64');
+export async function loadReceipt(input: ReceiptInput, client?: SplitwiseClient): Promise<LoadedReceipt> {
+  const sources = [input.upload_id, input.path, input.base64].filter((v) => v !== undefined).length;
+  if (sources !== 1) {
+    throw new Error('receipt needs exactly one of upload_id, path or base64');
   }
 
-  const bytes = hasPath ? await readSandboxed(input.path!) : decodeBase64(input.base64!);
+  const bytes =
+    input.upload_id !== undefined
+      ? await readUpload(input.upload_id, client)
+      : input.path !== undefined
+        ? await readSandboxed(input.path)
+        : decodeBase64(input.base64!);
   if (bytes.length === 0) throw new Error('Receipt file is empty');
   if (bytes.length > MAX_RECEIPT_BYTES) throw tooBig(bytes.length);
 
