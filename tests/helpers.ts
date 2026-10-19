@@ -53,5 +53,16 @@ export async function confirmedCall(
  * the same `client.request`, so they are not counted.
  */
 export function writes(write: { mock: { calls: unknown[] } }): number {
-  return write.mock.calls.filter((call) => !(Array.isArray(call) && call[0] === 'GET')).length;
+  return write.mock.calls.filter((call) => !isRead(call)).length;
+}
+
+/** `client.request('GET', …)`, or a `fetch(url, { method: 'GET' })` / `fetch(request)` read. */
+function isRead(call: unknown): boolean {
+  if (!Array.isArray(call)) return false;
+  if (call[0] === 'GET') return true;
+  if (call[0] instanceof Request) return call[0].method === 'GET';
+  const isUrl = call[0] instanceof URL || (typeof call[0] === 'string' && /^https?:\/\//.test(call[0]));
+  if (!isUrl) return false;
+  const init = call[1] as { method?: string } | undefined;
+  return (init?.method ?? 'GET').toUpperCase() === 'GET';
 }

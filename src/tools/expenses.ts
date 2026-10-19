@@ -26,13 +26,10 @@ import {
   type LocalFilters,
   type UpstreamQuery,
 } from './_list.js';
+import { findDuplicates, inferCategory, resolveCategory, resolveEqualSplit } from './_create.js';
 import { assertNotDeleted, explainForbidden, verifyRestored, withPostState } from './_expense-state.js';
 
-interface UserShare {
-  user_id: number;
-  paid_share: string;
-  owed_share: string;
-}
+import type { UserShare } from './_split.js';
 
 /** Flattens a users array into Splitwise's flat-param JSON format. */
 export function flattenUsers(users: UserShare[]): Record<string, unknown> {
@@ -73,6 +70,11 @@ function buildExpenseBody(args: Record<string, unknown>): Record<string, unknown
     expense_id: _id,
     confirmToken: _confirmToken,
     receipt: _receipt,
+    // Resolved by the create handler into category_id / users[].
+    category: _category,
+    split: _split,
+    paid_by: _paidBy,
+    split_among: _splitAmong,
     ...rest
   } = args as {
     split_equally?: boolean;
@@ -267,7 +269,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_create_expense',
     {
       description:
-        `Create a Splitwise expense. Use split_equally:true to split evenly among group members, or provide a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. Pass receipt to attach an image or PDF in the same call. This puts charges on every participant's balance and notifies them. ${CONFIRM_NOTE}`,
+        `Create a Splitwise expense. Splits: split_equally:true (you paid, everyone in the group owes an equal part); split:"equal" with paid_by (someone — e.g. the other parent — paid, split equally among split_among or the whole group); or a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. Pass category by name (or category_id); with neither, the most common category of similar expenses in the group is used and shown in the preview as inferred_category. The preview also lists possible_duplicates — expenses in the group, live or deleted, with the same cost, a similar description and a date within a day; check them before confirming. Pass receipt to attach an image or PDF in the same call. This puts charges on every participant's balance and notifies them. ${CONFIRM_NOTE}`,
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
       inputSchema: z.object({
         group_id: z.number().describe('Group to add expense to (use 0 for no group)'),
@@ -283,30 +285,88 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
             'Custom split (mutually exclusive with split_equally). Full list of participants required.',
           )
           .optional(),
+        split: z
+          .literal('equal')
+          .describe('"equal": paid_by paid the whole cost and everyone in split_among owes an equal part (odd cents go to the first participants). Use instead of split_equally (which always makes YOU the payer) or users.')
+          .optional(),
+        paid_by: z
+          .union([z.number(), z.string().min(1)])
+          .describe('With split:"equal" — who paid: a user id, or a group member\'s name or email')
+          .optional(),
+        split_among: z
+          .array(z.union([z.number(), z.string().min(1)]))
+          .min(1)
+          .describe('With split:"equal" — who shares the cost (ids, names or emails). Default: every group member.')
+          .optional(),
         currency_code: z
           .string()
           .describe('Currency code, e.g. "USD". Defaults to group/user default.')
           .optional(),
         date: z.string().describe('ISO 8601 datetime').optional(),
         category_id: z.number().describe('Category id from sw_get_categories').optional(),
+        category: z
+          .string()
+          .min(1)
+          .describe('Category by name, e.g. "Education" or "Medical expenses" (any case). Mutually exclusive with category_id. Omit both and the most common category of similar expenses in the group is used.')
+          .optional(),
         details: z.string().describe('Notes').optional(),
         receipt: receiptParam,
         confirmToken: confirmTokenParam,
       }),
     },
     async (args, ctx) => {
+      if (args.category !== undefined && args.category_id !== undefined) {
+        throw new Error('Provide either category or category_id, not both');
+      }
+      if (args.split === 'equal') {
+        if (args.paid_by === undefined) throw new Error('split:"equal" needs paid_by (who paid the whole cost)');
+        if (args.split_equally) throw new Error('split:"equal" replaces split_equally — pass one or the other');
+        if (args.users) throw new Error('split:"equal" builds users for you — pass split or users, not both');
+      } else if (args.paid_by !== undefined || args.split_among !== undefined) {
+        throw new Error('paid_by and split_among only apply with split:"equal"');
+      }
+
       const body = buildExpenseBody(args as Record<string, unknown>);
+      if (args.split === 'equal') {
+        Object.assign(body, flattenUsers(await resolveEqualSplit(client, {
+          group_id: args.group_id,
+          cost: args.cost,
+          paid_by: args.paid_by!,
+          split_among: args.split_among,
+        })));
+      }
+      const extra: Record<string, unknown> = {};
+      if (args.category !== undefined) {
+        body.category_id = (await resolveCategory(client, args.category)).id;
+      } else if (args.category_id === undefined && args.group_id > 0) {
+        const inferred = await inferCategory(client, args.group_id, args.description);
+        if (inferred) {
+          body.category_id = inferred.id;
+          extra.inferred_category = inferred;
+        }
+      }
       const receipt = args.receipt ? await loadReceipt(args.receipt) : undefined;
+      const duplicates =
+        args.group_id > 0
+          ? await findDuplicates(client, { group_id: args.group_id, cost: args.cost, description: args.description, date: args.date })
+          : [];
+      if (duplicates.length > 0) extra.possible_duplicates = duplicates;
+
       const gate = await confirmWrite(ctx, {
         tool: 'sw_create_expense',
         action: 'expense.create',
-        summary: `Create a Splitwise expense "${args.description}" (${args.cost})${receipt ? ` with receipt ${receipt.filename}` : ''} — notifies group members`,
+        summary:
+          `Create a Splitwise expense "${args.description}" (${args.cost})${receipt ? ` with receipt ${receipt.filename}` : ''} — notifies group members` +
+          (duplicates.length > 0
+            ? ` — WARNING: ${duplicates.length} possible duplicate${duplicates.length > 1 ? 's' : ''} already in the group (see possible_duplicates)`
+            : ''),
         method: 'POST',
         path: '/create_expense',
         body: previewBody(body, receipt),
         target: args.group_id,
         confirmToken: args.confirmToken,
         args,
+        extra,
       });
       if (gate) return gate;
       const data = await sendExpenseWrite(client, '/create_expense', body, receipt);

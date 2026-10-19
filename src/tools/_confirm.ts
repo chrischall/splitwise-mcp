@@ -33,6 +33,11 @@ export interface WriteGate {
    * dropped by mcp-utils.
    */
   args: object;
+  /**
+   * Extra preview fields the user should weigh before approving — an inferred
+   * category, possible duplicates. Shown on both rails and bound like the rest.
+   */
+  extra?: Record<string, unknown>;
 }
 
 /**
@@ -52,7 +57,7 @@ export function confirmWrite(ctx: ServerContext, gate: WriteGate) {
     path: gate.path,
     ...(gate.body !== undefined ? { willSend: gate.body } : {}),
   };
-  const preview = { action: gate.summary, ...request };
+  const preview = { ...gate.extra, action: gate.summary, ...request };
   return requireConfirmationWithFallback(
     ctx,
     confirmationFromEnv({
