@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SW_VIEWS, viewExpense, viewExpenses } from '../project.js';
+import { EXPENSE_LIST_VIEWS, SW_VIEWS, viewExpense, viewExpenses } from '../project.js';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { buildQueryString, minifiedResult, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
@@ -13,6 +13,19 @@ import {
   verifyReceiptStored,
   type LoadedReceipt,
 } from './_receipt.js';
+import {
+  attachComments,
+  decodeCursor,
+  encodeCursor,
+  hasLocalFilters,
+  projectForList,
+  scanExpenses,
+  MAX_COMMENT_ROWS,
+  SCAN_BUDGET,
+  type ListView,
+  type LocalFilters,
+  type UpstreamQuery,
+} from './_list.js';
 import { assertNotDeleted, explainForbidden, verifyRestored, withPostState } from './_expense-state.js';
 
 interface UserShare {
@@ -30,6 +43,25 @@ export function flattenUsers(users: UserShare[]): Record<string, unknown> {
     flat[`users__${i}__owed_share`] = u.owed_share;
   });
   return flat;
+}
+
+/** A full unfiltered page may have more behind it: hand back a cursor to it. */
+function withCursor(
+  out: unknown,
+  page: unknown,
+  offset: number,
+  want: number,
+  q: UpstreamQuery,
+  filters: LocalFilters,
+): unknown {
+  if (!Array.isArray(page) || page.length < want || out === null || typeof out !== 'object') return out;
+  return { ...(out as object), next_cursor: encodeCursor(offset + page.length, q, filters) };
+}
+
+function commentNote(note: { truncated: boolean } | undefined) {
+  return note?.truncated
+    ? { comments_note: `Comments were inlined for the first ${MAX_COMMENT_ROWS} expenses that have any; narrow the filters or page with a smaller limit for the rest.` }
+    : {};
 }
 
 function buildExpenseBody(args: Record<string, unknown>): Record<string, unknown> {
@@ -100,12 +132,15 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_list_expenses',
     {
       description:
-        `List or search Splitwise expenses. All filters are optional. Use group_id to filter by group, dated_after/dated_before for date ranges. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
+        `List or search Splitwise expenses. All filters are optional. group_id / friend_id / dated_after / dated_before / updated_after / updated_before are applied by Splitwise; description_contains, include_deleted, created_by, min_cost / max_cost and category are applied here while paging through the history (up to ${SCAN_BUDGET} records per call), returning up to \`limit\` matches and a next_cursor to continue. For reconciliation use view:"rows" (one flat line per expense: id, date, description, cost, created_by, deleted_at, deleted_by, comments_count, has_receipt) and include_comments:true to see why entries were deleted. Deleted expenses are included unless include_deleted is false. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
       annotations: { readOnlyHint: true, openWorldHint: true },
       inputSchema: z.object({
-        view: viewParam(SW_VIEWS, {
-          note: 'compact keeps the share breakdown, repayments and receipt presence and drops the avatars and the repeat/reminder/transaction block; "full" returns Splitwise\'s whole records.',
-        }),
+        view: z
+          .enum(EXPENSE_LIST_VIEWS)
+          .describe(
+            'Response shape. "compact" (default) keeps the share breakdown, repayments and receipt presence and drops the avatars and the repeat/reminder/transaction block; "rows" is one flat line per expense for reconciling long histories; "full" returns Splitwise\'s whole records.',
+          )
+          .optional(),
         group_id: z.number().describe('Only expenses in this group').optional(),
         friend_id: z.number().describe('Only expenses with this friend').optional(),
         dated_after: z
@@ -118,6 +153,33 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
           .optional(),
         updated_after: z.string().describe('ISO 8601 datetime').optional(),
         updated_before: z.string().describe('ISO 8601 datetime').optional(),
+        description_contains: z
+          .string()
+          .min(1)
+          .describe('Only expenses whose description contains this text (case-insensitive)')
+          .optional(),
+        include_deleted: z
+          .union([z.boolean(), z.literal('only')])
+          .describe('true (default): live and deleted; false: live only; "only": deleted only')
+          .optional(),
+        created_by: z
+          .union([z.number(), z.string().min(1)])
+          .describe('Only expenses created by this user: a user id, or part of their name / their email')
+          .optional(),
+        min_cost: z.number().describe('Only expenses costing at least this much').optional(),
+        max_cost: z.number().describe('Only expenses costing at most this much').optional(),
+        category: z
+          .union([z.number(), z.string().min(1)])
+          .describe('Only expenses in this category: a category id, or its name (any case)')
+          .optional(),
+        include_comments: z
+          .boolean()
+          .describe(`Inline each matched expense's comments (only those that have any; at most ${MAX_COMMENT_ROWS} expenses per call)`)
+          .optional(),
+        cursor: z
+          .string()
+          .describe('next_cursor from a previous call with the same filters, to continue where it stopped')
+          .optional(),
         // Bounded: Splitwise reads limit=0 as "return everything", an
         // unbounded result the host refuses.
         limit: z
@@ -125,24 +187,61 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
           .int()
           .min(1)
           .max(200)
-          .describe('Max results, 1-200 (API default: 20). Page with offset for more.')
+          .describe('Max results, 1-200 (default 20). With the local filters, the max number of MATCHES returned.')
           .optional(),
-        offset: z.number().int().min(0).describe('Pagination offset').optional(),
+        offset: z.number().int().min(0).describe('Pagination offset (prefer cursor)').optional(),
       }),
     },
     async (args) => {
-      const qs = buildQueryString({
+      const view: ListView = args.view ?? 'compact';
+      const q: UpstreamQuery = {
         group_id: args.group_id,
         friend_id: args.friend_id,
         dated_after: args.dated_after,
         dated_before: args.dated_before,
         updated_after: args.updated_after,
         updated_before: args.updated_before,
-        limit: args.limit,
-        offset: args.offset,
+      };
+      const filters: LocalFilters = {
+        description_contains: args.description_contains,
+        include_deleted: args.include_deleted,
+        created_by: args.created_by,
+        min_cost: args.min_cost,
+        max_cost: args.max_cost,
+        category: args.category,
+      };
+      const want = args.limit ?? 20;
+
+      if (!hasLocalFilters(filters) && args.cursor === undefined) {
+        // No local filtering: one request, exactly as before.
+        const qs = buildQueryString({ ...q, limit: args.limit, offset: args.offset });
+        const data = await client.request('GET', `/get_expenses${qs}`);
+        const page = (data as { expenses?: unknown } | null)?.expenses;
+        if (view === 'compact' && !args.include_comments) {
+          const out = viewExpenses('compact', data);
+          return swUntrustedResult(withCursor(out, page, (args.offset ?? 0), want, q, filters));
+        }
+        if (!Array.isArray(page)) return swUntrustedResult(data);
+        const rows = page.map((e) => projectForList(view, e));
+        const note = args.include_comments ? await attachComments(client, page, rows) : undefined;
+        return swUntrustedResult(
+          withCursor({ expenses: rows, ...commentNote(note) }, page, args.offset ?? 0, want, q, filters),
+        );
+      }
+
+      const start = args.cursor !== undefined ? decodeCursor(args.cursor, q, filters) : (args.offset ?? 0);
+      const scan = await scanExpenses(client, q, filters, start, want);
+      const rows = scan.expenses.map((e) => projectForList(view, e));
+      const note = args.include_comments ? await attachComments(client, scan.expenses, rows) : undefined;
+      return swUntrustedResult({
+        expenses: rows,
+        scanned: scan.scanned,
+        ...(scan.nextOffset !== undefined ? { next_cursor: encodeCursor(scan.nextOffset, q, filters) } : {}),
+        ...(scan.nextOffset !== undefined && scan.expenses.length < want
+          ? { note: `Stopped after reading ${scan.scanned} records; pass next_cursor to keep searching older expenses.` }
+          : {}),
+        ...commentNote(note),
       });
-      const data = await client.request('GET', `/get_expenses${qs}`);
-      return swUntrustedResult(viewExpenses(resolveView(args.view, SW_VIEWS), data));
     },
   );
 
