@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.5.0](https://github.com/chrischall/splitwise-mcp/compare/v3.4.1...v3.5.0) (2026-10-19)
+
+
+### Features
+
+* **confirm:** sw_confirm finishes a write with the token alone; sw_batch runs several writes under one approval ([#259](https://github.com/chrischall/splitwise-mcp/issues/259)) ([33d01fe](https://github.com/chrischall/splitwise-mcp/commit/33d01fe576f3e9789152ad7ae5c6cd1378dfd14f))
+* **expenses:** reconciliation filters, full-size receipt uploads, honest undelete and smarter create defaults ([#256](https://github.com/chrischall/splitwise-mcp/issues/256)) ([3996c73](https://github.com/chrischall/splitwise-mcp/commit/3996c73934b1b51776d05404fb3d166e85f45056))
+
+
+### Bug Fixes
+
+* **deps:** bump dotenv from 18.0.6 to 18.0.8 in the production-dependencies group ([#252](https://github.com/chrischall/splitwise-mcp/issues/252)) ([ba3648f](https://github.com/chrischall/splitwise-mcp/commit/ba3648f6f6b44dc4268519689b0093b798053a9c))
+
+
+### Documentation
+
+* **mint:** add sample prompts for the public catalog ([#255](https://github.com/chrischall/splitwise-mcp/issues/255)) ([7e37ec3](https://github.com/chrischall/splitwise-mcp/commit/7e37ec39997268bdc8d7e317bd5463c8129af2af))
+
 ## [3.4.1](https://github.com/chrischall/splitwise-mcp/compare/v3.4.0...v3.4.1) (2026-10-16)
 
 
