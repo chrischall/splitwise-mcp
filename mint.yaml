@@ -11,6 +11,13 @@ env:
     help: >-
       Your Splitwise API key. Register an app at
       https://secure.splitwise.com/apps/register and copy its API key.
+examples:
+  - prompt: Who do I owe money to on Splitwise right now, and how much?
+    note: Reads your friend balances; changes nothing.
+  - prompt: Show me everything we spent in my "Beach Trip" group last month.
+    note: Lists the group's expenses for a date range.
+  - prompt: What's the outstanding balance between members of my apartment group?
+    note: Reads the group's members and balances.
 egress:
   allow:
     # Only hosts the SERVER process actually fetches. Hosts that appear
