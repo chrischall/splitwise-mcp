@@ -345,7 +345,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
           extra.inferred_category = inferred;
         }
       }
-      const receipt = args.receipt ? await loadReceipt(args.receipt) : undefined;
+      const receipt = args.receipt ? await loadReceipt(args.receipt, client) : undefined;
       const duplicates =
         args.group_id > 0
           ? await findDuplicates(client, { group_id: args.group_id, cost: args.cost, description: args.description, date: args.date })
@@ -402,7 +402,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     async (args, ctx) => {
       const { expense_id } = args;
       const body = buildExpenseBody(args as Record<string, unknown>);
-      const receipt = args.receipt ? await loadReceipt(args.receipt) : undefined;
+      const receipt = args.receipt ? await loadReceipt(args.receipt, client) : undefined;
       await assertNotDeleted(client, expense_id);
       const gate = await confirmWrite(ctx, {
         tool: 'sw_update_expense',
@@ -427,7 +427,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     'sw_attach_receipt',
     {
       description:
-        `Attach (or replace) the receipt image or PDF on an existing Splitwise expense. Changes nothing else on the expense — cost, split and description are not sent. Pass the file as receipt.base64. Fails if Splitwise does not store the file. ${CONFIRM_NOTE}`,
+        `Attach (or replace) the receipt image or PDF on an existing Splitwise expense. Changes nothing else on the expense — cost, split and description are not sent. Pass the file as receipt.upload_id (hosted: upload it first via sw_get_upload_url — no bytes in the tool call), receipt.path (local) or receipt.base64. Fails if Splitwise does not store the file. ${CONFIRM_NOTE}`,
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
       inputSchema: z.object({
         expense_id: z.number().describe('ID of the expense to attach the receipt to'),
@@ -437,7 +437,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     },
     async (args, ctx) => {
       const { expense_id } = args;
-      const receipt = await loadReceipt(args.receipt);
+      const receipt = await loadReceipt(args.receipt, client);
       const path = `/update_expense/${expense_id}`;
       await assertNotDeleted(client, expense_id);
       const gate = await confirmWrite(ctx, {

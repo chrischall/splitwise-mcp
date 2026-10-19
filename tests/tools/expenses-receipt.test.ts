@@ -280,10 +280,10 @@ describe('sw_attach_receipt', () => {
 });
 
 describe('loadReceipt: shape and type', () => {
-  it('needs exactly one of path or base64', async () => {
-    await expect(loadReceipt({ filename: 'a.png' })).rejects.toThrow('exactly one of path or base64');
+  it('needs exactly one of upload_id, path or base64', async () => {
+    await expect(loadReceipt({ filename: 'a.png' })).rejects.toThrow('exactly one of upload_id, path or base64');
     await expect(loadReceipt({ path: 'x.png', base64: b64(PNG), filename: 'a.png' })).rejects.toThrow(
-      'exactly one of path or base64',
+      'exactly one of upload_id, path or base64',
     );
   });
 
