@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { ApiError, readEnvVar } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
-import { blobConfig, signedGetUrl, UPLOAD_ID_PATTERN } from './_blob.js';
+import { blobStoreFromEnv } from '@chrischall/mcp-utils/export';
 import { z } from 'zod';
 
 /**
@@ -137,6 +137,20 @@ async function readSandboxed(requested: string): Promise<Uint8Array<ArrayBuffer>
   }
 }
 
+/**
+ * The only keys `receipt.upload_id` may name: `up/<uuid>/<safe name>`, exactly
+ * what `sw_get_upload_url` mints. Anything else in this registration's space
+ * is not the caller's to read through a receipt.
+ */
+export const UPLOAD_ID_PATTERN = /^up\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[A-Za-z0-9_-][A-Za-z0-9._-]{0,99}$/;
+
+/** A filename made safe for a blob key segment: no separators, no dot-dot, no surprises. */
+export function safeKeyName(filename: string): string {
+  const base = filename.split(/[\\/]/).pop() ?? '';
+  const cleaned = base.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+/, '').slice(0, 100);
+  return cleaned || 'receipt';
+}
+
 /** How long the server's own read link for an upload lives — it is used at once. */
 const UPLOAD_READ_TTL_MS = 5 * 60 * 1000;
 
@@ -148,12 +162,12 @@ async function readUpload(uploadId: string, client: SplitwiseClient | undefined)
   if (!UPLOAD_ID_PATTERN.test(uploadId)) {
     throw new Error('receipt.upload_id is not one sw_get_upload_url issued (expected up/<uuid>/<filename>)');
   }
-  const cfg = blobConfig();
-  if (!cfg || !client) {
+  const store = blobStoreFromEnv();
+  if (!store || !client) {
     throw new Error('receipt.upload_id only works on the hosted server; pass receipt.path or receipt.base64 here.');
   }
   try {
-    const asset = await client.fetchAsset(signedGetUrl(cfg, uploadId, Date.now() + UPLOAD_READ_TTL_MS), {
+    const asset = await client.fetchAsset(store.signGetUrl(uploadId, { ttlMs: UPLOAD_READ_TTL_MS }).url, {
       maxBytes: MAX_RECEIPT_BYTES,
     });
     return Uint8Array.from(asset.bytes);

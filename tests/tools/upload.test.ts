@@ -74,6 +74,16 @@ describe('sw_get_upload_url', () => {
     expect(html.isError).toBe(true);
   });
 
+  it.each(['https://mcp.test/', 'https://mcp.test/b/', 'https://mcp.test/b/reg_abc123?x=1'])(
+    'refuses to sign against a base URL with no registration path, or a query: %s',
+    async (base) => {
+      vi.stubEnv('MCP_BLOB_BASE_URL', base);
+      const result = await harness.callTool('sw_get_upload_url', { filename: 'a.png', content_type: 'image/png' });
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result.content)).toMatch(/MCP_BLOB_BASE_URL/);
+    },
+  );
+
   it('explains the alternatives when this server has no blob store (stdio)', async () => {
     vi.stubEnv('MCP_BLOB_BASE_URL', '');
     const result = await harness.callTool('sw_get_upload_url', { filename: 'a.png', content_type: 'image/png' });
@@ -94,6 +104,20 @@ describe('receipt.upload_id', () => {
     const exp = parsed.searchParams.get('exp');
     expect(parsed.searchParams.get('sig')).toBe(hmac(`reg_abc123/up/1b4e28ba-2fa1-11d2-883f-0016d3cca427/r.png\n${exp}`));
     expect(opts).toEqual({ maxBytes: 10 * 1024 * 1024 });
+  });
+
+  it('signs the read link byte for byte as the pre-library signer did (pinned vector)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(1_790_000_000_000);
+    try {
+      mockAsset.mockResolvedValue({ status: 200, contentType: 'image/png', headers: new Headers(), bytes: PNG });
+      await loadReceipt({ upload_id: 'up/1b4e28ba-2fa1-11d2-883f-0016d3cca427/r.png', filename: 'r.png' }, client);
+      expect(mockAsset.mock.calls[0]![0]).toBe(
+        'https://mcp.test/b/reg_abc123/up/1b4e28ba-2fa1-11d2-883f-0016d3cca427/r.png?exp=1790000300000&sig=XdgCAVdCcA9BCIGoManaD5J9G4UdEvfF8WYjh0yoER8',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each(['lib/x/secret.png', 'up/../lib/a.png', 'up/abc/r.png', '/up/1b4e28ba-2fa1-11d2-883f-0016d3cca427/r.png'])(
