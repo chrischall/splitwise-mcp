@@ -3,8 +3,8 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { minifiedResult } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
-import { blobConfig, safeKeyName, signedPutUrl } from './_blob.js';
-import { canonicalReceiptMime, MAX_RECEIPT_BYTES } from './_receipt.js';
+import { blobStoreFromEnv } from '@chrischall/mcp-utils/export';
+import { canonicalReceiptMime, MAX_RECEIPT_BYTES, safeKeyName } from './_receipt.js';
 
 /** Long enough to run a curl in the same turn, short enough that a leaked link is soon dead. */
 export const UPLOAD_URL_TTL_MS = 10 * 60 * 1000;
@@ -32,16 +32,15 @@ export function registerUploadTools(server: McpServer, _client: SplitwiseClient)
       }),
     },
     async ({ filename, content_type }) => {
-      const cfg = blobConfig();
-      if (!cfg) {
+      const store = blobStoreFromEnv();
+      if (!store) {
         throw new Error(
           'sw_get_upload_url only works on the hosted server (no blob store is configured here). Pass the file as receipt.path (a file inside SPLITWISE_INPUT_DIR) or receipt.base64 instead.',
         );
       }
       const contentType = canonicalReceiptMime(content_type);
       const key = `up/${randomUUID()}/${safeKeyName(filename)}`;
-      const exp = Date.now() + UPLOAD_URL_TTL_MS;
-      const uploadUrl = signedPutUrl(cfg, key, contentType, exp);
+      const { url: uploadUrl, expiresAtMs: exp } = store.signPutUrl(key, contentType, { ttlMs: UPLOAD_URL_TTL_MS });
       return minifiedResult({
         upload_id: key,
         upload_url: uploadUrl,

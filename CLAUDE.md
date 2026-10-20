@@ -46,7 +46,7 @@ src/
     _expense-state.ts # deleted-expense pre-check, 403 explanation,
                   #   post_state, undelete verification
     uploads.ts    # sw_get_upload_url — signed PUT on mcp-host's blob store
-    _blob.ts      # blob-store signing (gateway payload shapes, byte for byte)
+                  #   (signing: blobStoreFromEnv from @chrischall/mcp-utils/export)
     receipts.ts   # sw_get_receipt — authenticated receipt download,
                   #   inline bytes, and PDF text extraction
     _receipt.ts   # receipt UPLOAD for create/update/attach: loadReceipt (upload_id |
