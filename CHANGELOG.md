@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.1](https://github.com/chrischall/splitwise-mcp/compare/v3.5.0...v3.5.1) (2026-10-20)
+
+
+### Bug Fixes
+
+* **receipts:** sign blob-store upload links with @chrischall/mcp-utils ([#262](https://github.com/chrischall/splitwise-mcp/issues/262)) ([5111daf](https://github.com/chrischall/splitwise-mcp/commit/5111dafaebd5ef163186b98f18c7861bba80d0d0))
+
 ## [3.5.0](https://github.com/chrischall/splitwise-mcp/compare/v3.4.1...v3.5.0) (2026-10-19)
 
 
