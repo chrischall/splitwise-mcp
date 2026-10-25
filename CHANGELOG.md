@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.2](https://github.com/chrischall/splitwise-mcp/compare/v3.5.1...v3.5.2) (2026-10-25)
+
+
+### Bug Fixes
+
+* **deps:** bump the production-dependencies group with 2 updates ([#265](https://github.com/chrischall/splitwise-mcp/issues/265)) ([d6d4587](https://github.com/chrischall/splitwise-mcp/commit/d6d458713c31498705fab1ccb2e07a4fcf768df5))
+
 ## [3.5.1](https://github.com/chrischall/splitwise-mcp/compare/v3.5.0...v3.5.1) (2026-10-20)
 
 
