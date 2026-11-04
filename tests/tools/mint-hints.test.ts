@@ -192,6 +192,30 @@ describe('sw_list_friends view: brief (whats-due)', () => {
     expect(line.endsWith('— no date — owes you USD 1.00')).toBe(true);
   });
 
+  it('escapes a name that starts with "-- " or "\\" with one leading backslash, so it never reads as a note', async () => {
+    mockRequest.mockResolvedValue({
+      friends: [
+        { id: 8, first_name: '-- none', balance: [{ currency_code: 'USD', amount: '2' }] },
+        { id: 9, first_name: '\\Eve', balance: [{ currency_code: 'USD', amount: '-1' }] },
+      ],
+    });
+    expect(brief(text(await harness.callTool('sw_list_friends', { view: 'brief' }))).data).toEqual([
+      '\\-- none — no date — owes you USD 2.00',
+      '\\\\Eve — no date — you owe USD 1.00',
+    ]);
+  });
+
+  it('cuts the WHOLE line to 120 chars, title first, when balances in many currencies overflow it', async () => {
+    const codes = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'CHF', 'SEK', 'NOK', 'DKK'];
+    mockRequest.mockResolvedValue({
+      friends: [{ id: 10, first_name: 'Morgan', last_name: 'Longname', balance: codes.map((c) => ({ currency_code: c, amount: '123.45' })) }],
+    });
+    const [line] = brief(text(await harness.callTool('sw_list_friends', { view: 'brief' }))).data;
+    expect(line.length).toBeLessThanOrEqual(120);
+    expect(line.startsWith('Morgan Longname — no date — owes you USD 123.45')).toBe(true);
+    expect(line.endsWith('…')).toBe(true);
+  });
+
   it('reports an unreadable answer as an -- error note rather than an empty list', async () => {
     mockRequest.mockResolvedValue({ unexpected: true });
     const body = brief(text(await harness.callTool('sw_list_friends', { view: 'brief' })));
@@ -237,6 +261,12 @@ describe('sw_get_notifications view: brief (whats-new)', () => {
     expect(data).toHaveLength(51);
     expect(data[49]).toBe('n49 — 2026-11-01 — expense updated');
     expect(data[50]).toBe('-- 50 of 70 shown');
+  });
+
+  it('escapes notification text that starts with "-- " with one leading backslash', async () => {
+    mockRequest.mockResolvedValue({ notifications: [{ id: 1, type: 0, created_at: '2026-11-01T00:00:00Z', content: '-- 1 of 1 shown' }] });
+    const { data } = brief(text(await harness.callTool('sw_get_notifications', { view: 'brief' })));
+    expect(data).toEqual(['\\-- 1 of 1 shown — 2026-11-01 — expense added']);
   });
 
   it('reports an unreadable answer as an -- error note', async () => {
