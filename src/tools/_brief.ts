@@ -2,7 +2,8 @@
 // context-groups brief-view contract): one line per item, at most 120 chars,
 // `title — <ISO date | no date> — <status>`. A line starting `-- ` is a NOTE,
 // not an item: `-- none` for an empty answer, `-- N of M shown` when the list
-// was capped, `-- error: …` when the upstream answer could not be read. The
+// was capped, `-- error: …` when the upstream answer could not be read; an
+// item whose own title starts `-- ` or `\` is escaped with one `\`. The
 // lines carry text other Splitwise users wrote (their names, expense
 // descriptions), so they go inside the untrusted-data envelope as
 // `data: string[]`, minified — the same envelope the tools' other rungs use.
@@ -22,12 +23,25 @@ function asDict(v: unknown): Dict | undefined {
   return v !== null && typeof v === 'object' && !Array.isArray(v) ? (v as Dict) : undefined;
 }
 
-/** `title — date — status`, the title cut (with an ellipsis) so the line fits. */
-export function briefLine(title: string, date: string, status: string): string {
-  const tail = ` — ${date} — ${status}`;
-  const room = BRIEF_MAX - tail.length;
-  const shown = title.length > room ? `${title.slice(0, Math.max(room - 1, 0))}…` : title;
-  return `${shown}${tail}`;
+/** The shortest a title is cut to before the status gives way too. */
+const TITLE_FLOOR = 24;
+
+const cut = (s: string, n: number): string => (s.length > n ? `${s.slice(0, Math.max(n - 1, 0))}…` : s);
+
+/**
+ * `title — date — status`, cut to ≤ 120 chars as a WHOLE, title first: the
+ * title shortens until the line fits, and once it is at its floor the status
+ * is cut too. A title starting `-- ` or `\` is escaped with one leading `\`
+ * so it never reads as a note (the gateway strips one backslash from every
+ * item line after its note check).
+ */
+export function briefLine(rawTitle: string, date: string, status: string): string {
+  const title = rawTitle.startsWith('-- ') || rawTitle.startsWith('\\') ? `\\${rawTitle}` : rawTitle;
+  const sep = ` — ${date} — `;
+  const room = BRIEF_MAX - sep.length;
+  if (title.length + status.length <= room) return `${title}${sep}${status}`;
+  const shownTitle = cut(title, Math.max(room - status.length, Math.min(title.length, TITLE_FLOOR)));
+  return `${shownTitle}${sep}${cut(status, room - shownTitle.length)}`;
 }
 
 function enveloped(lines: string[], note: string): CallToolResult {
