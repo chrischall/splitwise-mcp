@@ -1,5 +1,20 @@
 # Changelog
 
+## [3.6.0](https://github.com/chrischall/splitwise-mcp/compare/v3.5.1...v3.6.0) (2026-11-04)
+
+
+### Features
+
+* context-group hints ([#270](https://github.com/chrischall/splitwise-mcp/issues/270)) ([af4dcef](https://github.com/chrischall/splitwise-mcp/commit/af4dcefcd77a6f5d39a3e6ee6d0fb1a171f657ec))
+
+
+### Bug Fixes
+
+* **brief:** align the brief view with the fleet contract ([#271](https://github.com/chrischall/splitwise-mcp/issues/271)) ([2a576d9](https://github.com/chrischall/splitwise-mcp/commit/2a576d983bbf3c24f3a43b836cca4b1de7a25768))
+* **deps:** bump the production-dependencies group across 1 directory with 3 updates ([#268](https://github.com/chrischall/splitwise-mcp/issues/268)) ([046eb57](https://github.com/chrischall/splitwise-mcp/commit/046eb5745c1031fbdc47444bfd4cfa87f65da303))
+* **deps:** bump the production-dependencies group with 2 updates ([#265](https://github.com/chrischall/splitwise-mcp/issues/265)) ([d6d4587](https://github.com/chrischall/splitwise-mcp/commit/d6d458713c31498705fab1ccb2e07a4fcf768df5))
+* **deps:** bump unpdf from 1.9.1 to 2.0.0 in the production-majors group ([#269](https://github.com/chrischall/splitwise-mcp/issues/269)) ([98d0a4e](https://github.com/chrischall/splitwise-mcp/commit/98d0a4e1a31a220007fcb22e0a3377105d7ec2e5))
+
 ## [3.5.1](https://github.com/chrischall/splitwise-mcp/compare/v3.5.0...v3.5.1) (2026-10-20)
 
 
