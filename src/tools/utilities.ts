@@ -12,6 +12,8 @@ import {
 import type { SplitwiseClient } from '../client.js';
 import { UNTRUSTED_DESCRIPTION_SUFFIX, swUntrustedResult } from './_untrusted.js';
 import { assertNotDeleted, explainForbidden } from './_expense-state.js';
+import { moneyMeta, withToolMeta } from './hints.js';
+import { BRIEF_NOTIFICATION_CAP, notificationsBrief } from './_brief.js';
 
 export function registerUtilityTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool(
@@ -19,14 +21,20 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     {
       description: `Get recent Splitwise activity notifications for the current user. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: moneyMeta('whats-new', {
+        canonical: true,
+        aliases: ['splitwise', 'anything new', 'recent activity', 'activity', 'new expenses'],
+      }),
       inputSchema: z.object({
-        view: viewParam(SW_VIEWS, {
-          note: 'compact drops the avatar URLs; "full" returns Splitwise\'s whole record.',
-        }),
+        view: z
+          .enum([...SW_VIEWS, 'brief'])
+          .describe(`Response shape. compact (default) drops the avatar URLs; "full" returns Splitwise's whole record; "brief" is one line per notification (text — ISO date — kind, e.g. "expense added"), at most ${BRIEF_NOTIFICATION_CAP} with a "-- N of M shown" note past that, "-- none" when there is no activity.`)
+          .optional(),
       }),
     },
     async ({ view }) => {
       const data = await client.request('GET', '/get_notifications');
+      if (view === 'brief') return notificationsBrief(data);
       return swUntrustedResult(viewGeneric(resolveView(view, SW_VIEWS), data));
     },
   );
@@ -37,6 +45,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
       description:
         'Get the hierarchical list of Splitwise expense categories. Use the returned id as category_id when creating expenses.',
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: moneyMeta('lookup'),
     },
     async () => {
       const data = await client.request('GET', '/get_categories');
@@ -50,6 +59,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
       description:
         'Get all Splitwise-supported currency codes and units. Use the currency_code value when creating expenses in non-default currencies.',
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: moneyMeta('lookup'),
     },
     async () => {
       const data = await client.request('GET', '/get_currencies');
@@ -62,6 +72,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     {
       description: `Get all comments on a Splitwise expense. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: moneyMeta('lookup'),
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
           note: 'compact drops the avatar URLs; "full" returns Splitwise\'s whole record.',
@@ -77,7 +88,7 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     },
   );
 
-  registerWrite(server, defineWrite({
+  withToolMeta(server, moneyMeta('send', { aliases: ['comment on an expense'] }), () => registerWrite(server, defineWrite({
     name: 'sw_create_comment',
     description:
       'Add a comment to a Splitwise expense (visible to other participants). Refused up front, naming who deleted it, if the expense is deleted — restore it with sw_undelete_expense first.',
@@ -102,9 +113,9 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     execute: ({ expense_id, content }) =>
       explainForbidden(client, expense_id, () => client.request('POST', '/create_comment', { expense_id, content })),
     render: minifiedResult,
-  }));
+  })));
 
-  registerWrite(server, defineWrite({
+  withToolMeta(server, moneyMeta('change'), () => registerWrite(server, defineWrite({
     name: 'sw_delete_comment',
     description: 'Delete a comment by id.',
     inputSchema: z.object({
@@ -122,5 +133,5 @@ export function registerUtilityTools(server: McpServer, client: SplitwiseClient)
     }),
     execute: (id) => client.request('POST', `/delete_comment/${id}`),
     render: minifiedResult,
-  }));
+  })));
 }

@@ -55,6 +55,10 @@ src/
     utilities.ts  # sw_get_notifications, sw_get_categories, sw_get_currencies,
                   #   sw_get_comments, sw_create_comment, sw_delete_comment
     _confirm.ts   # confirmWrite(): the gate for the group/friend/user writes
+    hints.ts      # _meta.mint context-group hints (group `money`): moneyMeta(),
+                  #   withToolMeta() for the mcp-utils-registered writes/batch/confirm
+    _brief.ts     # view:"brief" for the canonical reads (sw_list_friends = whats-due,
+                  #   sw_get_notifications = whats-new): lines in the untrusted envelope
     batch.ts      # sw_confirm (registerConfirmTool) + sw_batch (registerBatchTool),
                   #   registered LAST — sw_batch lists the writes before it
 ```

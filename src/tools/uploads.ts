@@ -5,6 +5,7 @@ import { minifiedResult } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { blobStoreFromEnv } from '@chrischall/mcp-utils/export';
 import { canonicalReceiptMime, MAX_RECEIPT_BYTES, safeKeyName } from './_receipt.js';
+import { moneyMeta } from './hints.js';
 
 /** Long enough to run a curl in the same turn, short enough that a leaked link is soon dead. */
 export const UPLOAD_URL_TTL_MS = 10 * 60 * 1000;
@@ -24,6 +25,7 @@ export function registerUploadTools(server: McpServer, _client: SplitwiseClient)
       description:
         'Get a short-lived (~10 min) signed URL to upload a receipt file (PNG, JPEG, GIF or PDF, up to 10 MiB) to this server WITHOUT putting its bytes in a tool call: run the returned curl command from a shell or sandbox that has the file and network access to the URL\'s host, then pass receipt: {upload_id, filename} to sw_attach_receipt, sw_create_expense or sw_update_expense. Send the original file — no need to shrink it. Only on the hosted server; locally use receipt.path. If you have no shell that can reach the URL, use receipt.base64 instead.',
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: moneyMeta('other'),
       inputSchema: z.object({
         filename: z.string().min(1).max(200).describe('Name of the file, e.g. "receipt.jpg"'),
         content_type: z

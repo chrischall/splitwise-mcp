@@ -36,6 +36,7 @@ import { findDuplicates, inferCategory, resolveCategory, resolveEqualSplit } fro
 import { assertNotDeleted, explainForbidden, verifyRestored, withPostState } from './_expense-state.js';
 
 import type { UserShare } from './_split.js';
+import { moneyMeta, withToolMeta, EXPENSE_WRITE_ALIASES } from './hints.js';
 
 /** Flattens a users array into Splitwise's flat-param JSON format. */
 export function flattenUsers(users: UserShare[]): Record<string, unknown> {
@@ -156,6 +157,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
       description:
         `List or search Splitwise expenses. All filters are optional. group_id / friend_id / dated_after / dated_before / updated_after / updated_before are applied by Splitwise; description_contains, include_deleted, created_by, min_cost / max_cost and category are applied here while paging through the history (up to ${SCAN_BUDGET} records per call), returning up to \`limit\` matches and a next_cursor to continue. For reconciliation use view:"rows" (one flat line per expense: id, date, description, cost, created_by, deleted_at, deleted_by, comments_count, has_receipt) and include_comments:true to see why entries were deleted. Deleted expenses are included unless include_deleted is false. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: moneyMeta('lookup', { aliases: ['expenses', 'shared expenses', 'what did we spend', 'bills'] }),
       inputSchema: z.object({
         view: z
           .enum(EXPENSE_LIST_VIEWS)
@@ -272,6 +274,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     {
       description: `Get full details of a single Splitwise expense by id. ${UNTRUSTED_DESCRIPTION_SUFFIX}`,
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: moneyMeta('lookup'),
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
           note: 'compact keeps the share breakdown, repayments and receipt presence and drops the avatars and the repeat/reminder/transaction block; "full" returns Splitwise\'s whole records.',
@@ -285,7 +288,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     },
   );
 
-  registerWrite(server, defineWrite({
+  withToolMeta(server, moneyMeta('change', { aliases: EXPENSE_WRITE_ALIASES }), () => registerWrite(server, defineWrite({
     name: 'sw_create_expense',
     description:
       `Create a Splitwise expense. Splits: split_equally:true (you paid, everyone in the group owes an equal part); split:"equal" with paid_by (someone — e.g. the other parent — paid, split equally among split_among or the whole group); or a users array for custom per-person splits (paid_share and owed_share as decimal strings like "25.00"). cost must be a decimal string. Pass category by name (or category_id); with neither, the most common category of similar expenses in the group is used and shown in the preview as inferred_category. The preview also lists possible_duplicates — expenses in the group, live or deleted, with the same cost, a similar description and a date within a day; check them before confirming. Pass receipt to attach an image or PDF in the same call. This puts charges on every participant's balance and notifies them. In sw_batch it produces expense_id.`,
@@ -388,9 +391,9 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
       withPostState(await sendExpenseWrite(client, '/create_expense', body, receipt)),
     render: minifiedResult,
     produces: { expense_id: (result) => createdExpenseId(result) },
-  }));
+  })));
 
-  registerWrite(server, defineWrite({
+  withToolMeta(server, moneyMeta('change'), () => registerWrite(server, defineWrite({
     name: 'sw_update_expense',
     description:
       'Edit an existing Splitwise expense. Provide expense_id and any fields to change. For custom split updates, the full users array must be provided (the API replaces the entire split). To attach or replace the receipt on an existing expense, pass expense_id and receipt alone.',
@@ -434,9 +437,9 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         ),
       ),
     render: minifiedResult,
-  }));
+  })));
 
-  registerWrite(server, defineWrite({
+  withToolMeta(server, moneyMeta('change'), () => registerWrite(server, defineWrite({
     name: 'sw_attach_receipt',
     description:
       'Attach (or replace) the receipt image or PDF on an existing Splitwise expense. Changes nothing else on the expense — cost, split and description are not sent. Pass the file as receipt.upload_id (hosted: upload it first via sw_get_upload_url — no bytes in the tool call), receipt.path (local) or receipt.base64. Fails if Splitwise does not store the file.',
@@ -467,9 +470,9 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
         ),
       ),
     render: minifiedResult,
-  }));
+  })));
 
-  registerWrite(server, defineWrite({
+  withToolMeta(server, moneyMeta('change'), () => registerWrite(server, defineWrite({
     name: 'sw_delete_expense',
     description: 'Soft-delete a Splitwise expense by id. Returns {success: true} on success. Use sw_undelete_expense to restore.',
     inputSchema: z.object({
@@ -487,9 +490,9 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     }),
     execute: (id) => client.request('POST', `/delete_expense/${id}`),
     render: minifiedResult,
-  }));
+  })));
 
-  registerWrite(server, defineWrite({
+  withToolMeta(server, moneyMeta('change'), () => registerWrite(server, defineWrite({
     name: 'sw_undelete_expense',
     description:
       'Restore a soft-deleted Splitwise expense, then re-read it and return post_state {deleted_at, deleted_by, updated_at, updated_by}; if it is still (or again) deleted, the call fails naming who deleted it and when. This puts its charges back on every participant\'s balance and notifies them, so it is gated like the other writes.',
@@ -513,5 +516,5 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
     }),
     execute: async (id) => verifyRestored(client, id, await client.request('POST', `/undelete_expense/${id}`)),
     render: minifiedResult,
-  }));
+  })));
 }

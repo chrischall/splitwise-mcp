@@ -111,9 +111,31 @@ API key auth — no login flow or token rotation. The key is attached to every r
 | `sw_get_categories` | Hierarchical list of expense categories (use `id` as `category_id`) |
 | `sw_get_currencies` | List of supported currency codes |
 
+## In context groups
+
+On an mcp-host gateway, splitwise joins the **money** group (`_meta.mint` on every
+tool but `sw_healthcheck`). Its canonical reads, each answering one line per item
+with `view: "brief"` inside the untrusted-data envelope (`data: string[]`):
+
+- **what's due** — `sw_list_friends`: one line per friend with an outstanding
+  balance, `name — no date — owes you USD 12.50` / `you owe EUR 3.00`, then a
+  `-- N settled up` note; `-- none` when nothing is owed either way.
+- **what's new** — `sw_get_notifications`: recent activity, `text — <ISO date> —
+  <kind>` (expense added, comment added, …), at most 50 lines with a
+  `-- 50 of M shown` note past that; `-- none` for no activity.
+
+Neither names a subject (one API key is one account; friends and groups are who
+you split with, not whose question it is) and neither takes a date range. Nothing
+here answers what's on. Every other read is a `lookup`; the writes are `change`
+(`sw_create_comment` is `send`). A compound ask looks like "what do I owe on
+Splitwise, and is anything due at school?" — the money group reads the balances
+while the school group answers the rest. Splitwise is a direct API with a key,
+not a browser bridge, so it never answers "needs your browser open".
+
 ## Response shape (`view`)
 
-Nine read tools take `view: "compact" | "full"`, and **`compact` is the
+Nine read tools take `view: "compact" | "full"` (`sw_list_friends` and
+`sw_get_notifications` also take `"brief"`, above), and **`compact` is the
 default** — you get the slim rung without asking. Two of them are not in the
 table above: `sw_get_user(id, view?)` and `sw_get_comments(expense_id, view?)`.
 

@@ -11,6 +11,7 @@ import {
 } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { UNTRUSTED_DESCRIPTION_SUFFIX, swUntrustedEnvelope } from './_untrusted.js';
+import { moneyMeta } from './hints.js';
 
 /** Splitwise's receipt object on an expense — either rendition can be null. */
 interface ExpenseReceipt {
@@ -117,6 +118,7 @@ export function registerReceiptTools(server: McpServer, client: SplitwiseClient)
       // prompt. Not destructive either — `uniquePath` always picks a filename
       // that doesn't exist, so an existing file is never touched.
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+      _meta: moneyMeta('other', { aliases: ['receipt'] }),
       inputSchema: z.object({
         id: z.number().describe('Expense ID (the same id sw_get_expense takes)'),
         size: z

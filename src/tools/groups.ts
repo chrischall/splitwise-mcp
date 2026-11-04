@@ -4,6 +4,7 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { minifiedResult, pruneUndefined, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
+import { moneyMeta } from './hints.js';
 
 export function registerGroupTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool(
@@ -12,6 +13,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
       description:
         'List all Splitwise groups the current user belongs to. Returns id, name, and members for each group. Use this to resolve a group name to its id.',
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: moneyMeta('lookup', { aliases: ['splitwise groups', 'shared groups', 'house', 'trip'] }),
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
           note: 'compact drops the avatar/cover-photo URLs (60% of a live 51-group response, which does not fit in a tool result at all) and the whiteboard/reminder settings; "full" returns Splitwise\'s whole records.',
@@ -29,6 +31,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     {
       description: 'Get details of a single Splitwise group including all members and balances.',
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: moneyMeta('lookup', { aliases: ['group balance', 'who owes whom'] }),
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, {
           note: 'compact drops the avatar/cover-photo URLs (60% of a live 51-group response, which does not fit in a tool result at all) and the whiteboard/reminder settings; "full" returns Splitwise\'s whole records.',
@@ -47,6 +50,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
     {
       description: `Create a new Splitwise group. ${CONFIRM_NOTE}`,
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+      _meta: moneyMeta('change'),
       inputSchema: z.object({
         name: z.string().describe('Group name'),
         group_type: z
@@ -86,6 +90,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
       description:
         `Add a user to a Splitwise group. Provide user_id (preferred, use sw_list_friends to resolve a name) or first_name + last_name + email to invite by email. ${CONFIRM_NOTE}`,
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+      _meta: moneyMeta('change'),
       inputSchema: z.object({
         group_id: z.number().describe('Group ID'),
         user_id: z.number().describe('User ID (preferred)').optional(),
@@ -131,6 +136,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
       description:
         `Remove a user from a Splitwise group. ${CONFIRM_NOTE}`,
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+      _meta: moneyMeta('change'),
       inputSchema: z.object({
         group_id: z.number().describe('Group ID'),
         user_id: z.number().describe('User ID to remove'),
@@ -162,6 +168,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
       description:
         `Soft-delete a Splitwise group. ${CONFIRM_NOTE}`,
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+      _meta: moneyMeta('change'),
       inputSchema: z.object({
         id: z.number().describe('Group ID to delete'),
         confirmToken: confirmTokenParam,
@@ -193,6 +200,7 @@ export function registerGroupTools(server: McpServer, client: SplitwiseClient): 
       // Destructive despite the delete tool being its record-level inverse:
       // the restore notifies every participant, and no later call un-sends that.
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+      _meta: moneyMeta('change'),
       inputSchema: z.object({
         id: z.number().describe('Group ID to restore'),
         confirmToken: confirmTokenParam,
