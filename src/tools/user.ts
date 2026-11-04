@@ -4,6 +4,7 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { minifiedResult, pruneUndefined, resolveView, viewParam } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
 import { CONFIRM_NOTE, confirmTokenParam, confirmWrite } from './_confirm.js';
+import { moneyMeta } from './hints.js';
 
 export function registerUserTools(server: McpServer, client: SplitwiseClient): void {
   server.registerTool(
@@ -12,6 +13,7 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
       description:
         "Get the authenticated Splitwise user's profile. Use the returned id when building custom expense splits. The compact default returns id, name (first_name + last_name joined), email and registration_status; pass view:'full' for Splitwise's raw record, which keeps first_name and last_name separate — the form sw_update_user takes.",
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: moneyMeta('lookup'),
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, { note: PERSON_VIEW_NOTE }),
       }),
@@ -28,6 +30,7 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
       description:
         "Get another Splitwise user's profile by id. Same shape as sw_get_current_user: the compact default merges first_name/last_name into name, and view:'full' keeps them separate.",
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: moneyMeta('lookup'),
       inputSchema: z.object({
         view: viewParam(SW_VIEWS, { note: PERSON_VIEW_NOTE }),
         id: z.number().describe('User ID'),
@@ -45,6 +48,7 @@ export function registerUserTools(server: McpServer, client: SplitwiseClient): v
       description:
         "Update the current user's profile fields: name, locale and default currency. id must be the current user's id. The login email and password are deliberately not settable here — account credentials are changed in the Splitwise app, not by an assistant. " + CONFIRM_NOTE,
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+      _meta: moneyMeta('change'),
       // No `email` / `password`: changing the login email is an account
       // takeover primitive (a password reset to the new address follows), and
       // the only gate would be a model-driven confirmation that injected text from

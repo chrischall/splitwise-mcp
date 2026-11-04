@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import { registerBatchTool, registerConfirmTool } from '@chrischall/mcp-utils';
 import type { SplitwiseClient } from '../client.js';
+import { EXPENSE_WRITE_ALIASES, moneyMeta, withToolMeta } from './hints.js';
 
 /**
  * `sw_confirm` and `sw_batch` — the two ways to spend fewer calls on Splitwise
@@ -17,10 +18,12 @@ import type { SplitwiseClient } from '../client.js';
  * Registered LAST: the batch tool lists the writes registered before it.
  */
 export function registerBatchTools(server: McpServer, _client: SplitwiseClient): void {
-  registerConfirmTool(server, { name: 'sw_confirm' });
-  registerBatchTool(server, {
-    name: 'sw_batch',
-    description:
-      'Several Splitwise writes in one go, e.g. create an expense, then sw_create_comment / sw_attach_receipt on it with refs {"expense_id": "0.expense_id"}.',
-  });
+  withToolMeta(server, moneyMeta('other'), () => registerConfirmTool(server, { name: 'sw_confirm' }));
+  withToolMeta(server, moneyMeta('change', { aliases: EXPENSE_WRITE_ALIASES }), () =>
+    registerBatchTool(server, {
+      name: 'sw_batch',
+      description:
+        'Several Splitwise writes in one go, e.g. create an expense, then sw_create_comment / sw_attach_receipt on it with refs {"expense_id": "0.expense_id"}.',
+    }),
+  );
 }
