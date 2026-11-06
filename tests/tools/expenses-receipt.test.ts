@@ -239,24 +239,24 @@ describe('receipt on sw_update_expense', () => {
 
 describe('sw_attach_receipt', () => {
   it('wraps the update path: multipart to /update_expense/<id> with only the file', async () => {
-    mockMultipart.mockResolvedValue(attached(4644807844));
+    mockMultipart.mockResolvedValue(attached(3002));
     const { phase1, result } = await confirmedCall(harness, mockMultipart, 'sw_attach_receipt', {
-      expense_id: 4644807844,
+      expense_id: 3002,
       receipt: { base64: b64(PDF), filename: 'AA_receipt.pdf', mime_type: 'application/pdf' },
     });
-    expect(phase1.preview.path).toBe('/update_expense/4644807844');
+    expect(phase1.preview.path).toBe('/update_expense/3002');
     expect((phase1.preview.willSend as Record<string, unknown>).receipt).toMatchObject({
       filename: 'AA_receipt.pdf',
       mime_type: 'application/pdf',
       sha256: sha(PDF),
     });
     const [method, path, form] = mockMultipart.mock.calls[0] as [string, string, FormData];
-    expect([method, path]).toEqual(['POST', '/update_expense/4644807844']);
+    expect([method, path]).toEqual(['POST', '/update_expense/3002']);
     expect([...form.keys()]).toEqual(['receipt']);
     expect(writes(mockRequest)).toBe(0);
     const out = parseToolResult<Record<string, unknown>>(result);
     expect(out.receipt_attached).toBe(true);
-    expect(out.receipt).toEqual(attached(4644807844).expenses[0].receipt);
+    expect(out.receipt).toEqual(attached(3002).expenses[0].receipt);
   });
 
   it('errors when the response has no receipt.original', async () => {

@@ -35,7 +35,7 @@ function asList(v: unknown): unknown[] {
   return Array.isArray(v) ? v : [];
 }
 
-/** "Alison Hall" from the first/last pair Splitwise returns on every user shape. */
+/** "Sam Doe" from the first/last pair Splitwise returns on every user shape. */
 export function nameOf(user: Dict | undefined): string | undefined {
   if (!user) return undefined;
   const parts = [user.first_name, user.last_name].filter((p): p is string => typeof p === 'string' && p !== '');

@@ -70,7 +70,7 @@ describe('sw_confirm and sw_batch', () => {
 
   it('sw_batch: expense + comment + receipt under one approval, with the new expense id fed forward', async () => {
     const ops = [
-      { tool: 'sw_create_expense', args: { group_id: 0, description: 'Egan camp', cost: '250.00', split_equally: true } },
+      { tool: 'sw_create_expense', args: { group_id: 0, description: 'Example camp', cost: '250.00', split_equally: true } },
       { tool: 'sw_create_comment', args: { content: 'paid by card' }, refs: { expense_id: '0.expense_id' } },
       { tool: 'sw_attach_receipt', args: { receipt: { base64: b64, filename: 'camp.png' } }, refs: { expense_id: '0.expense_id' } },
     ];

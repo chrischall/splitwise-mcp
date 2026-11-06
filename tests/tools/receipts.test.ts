@@ -13,9 +13,9 @@ const { registerReceiptTools } = await import('../../src/tools/receipts.js');
 // The receipt URL shapes Splitwise actually serves: its own API (needs the key)
 // and a presigned S3 URL (must NOT be sent the key).
 const API_RECEIPT_URL =
-  'https://www.splitwise.com/api/v4.0/expenses/4644814211/receipt?cachebust=abc123&size=large';
+  'https://www.splitwise.com/api/v4.0/expenses/3003/receipt?cachebust=abc123&size=large';
 const S3_RECEIPT_URL =
-  'https://splitwise.s3.amazonaws.com/uploads/expense/receipt/4644814211/receipt.pdf?X-Amz-Signature=SECRETSIG';
+  'https://splitwise.s3.amazonaws.com/uploads/expense/receipt/3003/receipt.pdf?X-Amz-Signature=SECRETSIG';
 
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
 const PDF = new Uint8Array([...Buffer.from('%PDF-1.4\n', 'latin1'), 0x0a]);
@@ -84,7 +84,7 @@ function binaryResponse(bytes: Uint8Array, contentType?: string) {
 
 /** `GET /get_expense/:id` shaped like the real API, with the given receipt. */
 function expenseResponse(receipt: { original?: string | null; large?: string | null } | null) {
-  return jsonResponse({ expense: { id: 4644814211, description: 'Dinner', receipt } });
+  return jsonResponse({ expense: { id: 3003, description: 'Dinner', receipt } });
 }
 
 let outputDir: string;
@@ -175,7 +175,7 @@ describe('sw_get_receipt', () => {
       .mockResolvedValueOnce(binaryResponse(JPEG, 'image/jpeg'));
     const harness = await harnessWith(fetchMock);
 
-    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    const result = await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir });
     const body = parseToolResult<{ path: string; bytes: number; content_type: string; size: string; source_host: string }>(result);
 
     expect(result.isError).toBeFalsy();
@@ -183,7 +183,7 @@ describe('sw_get_receipt', () => {
     expect(body.bytes).toBe(JPEG.length);
     expect(body.content_type).toBe('image/jpeg');
     expect(body.source_host).toBe('www.splitwise.com');
-    expect(basename(body.path)).toBe('splitwise-receipt-4644814211.jpg');
+    expect(basename(body.path)).toBe('splitwise-receipt-3003.jpg');
     // The real bytes landed on disk — the whole point of the tool.
     expect(new Uint8Array(readFileSync(body.path))).toEqual(JPEG);
 
@@ -196,7 +196,7 @@ describe('sw_get_receipt', () => {
       .mockResolvedValueOnce(binaryResponse(JPEG, 'image/jpeg'));
     const harness = await harnessWith(fetchMock);
 
-    await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir });
 
     // The exact URL from the expense, query intact — this is the request that
     // used to 401 when made without credentials.
@@ -212,7 +212,7 @@ describe('sw_get_receipt', () => {
       .mockResolvedValueOnce(binaryResponse(PDF, 'application/pdf'));
     const harness = await harnessWith(fetchMock);
 
-    await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir });
 
     expect(fetchMock.mock.calls[1]![0]).toBe(S3_RECEIPT_URL);
     expect(headersOf(fetchMock, 1)).not.toHaveProperty('Authorization');
@@ -227,7 +227,7 @@ describe('sw_get_receipt', () => {
     const harness = await harnessWith(fetchMock);
 
     const result = await harness.callTool('sw_get_receipt', {
-      id: 4644814211,
+      id: 3003,
       size: 'large',
       output_dir: outputDir,
     });
@@ -235,7 +235,7 @@ describe('sw_get_receipt', () => {
 
     expect(body.size).toBe('original');
     expect(body.requested_size).toBe('large');
-    expect(basename(body.path)).toBe('splitwise-receipt-4644814211.pdf');
+    expect(basename(body.path)).toBe('splitwise-receipt-3003.pdf');
 
     await harness.close();
   });
@@ -247,11 +247,11 @@ describe('sw_get_receipt', () => {
     const harness = await harnessWith(fetchMock);
 
     const body = parseToolResult<{ content_type: string; path: string }>(
-      await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir }),
+      await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir }),
     );
 
     expect(body.content_type).toBe('application/pdf');
-    expect(basename(body.path)).toBe('splitwise-receipt-4644814211.pdf');
+    expect(basename(body.path)).toBe('splitwise-receipt-3003.pdf');
 
     await harness.close();
   });
@@ -263,7 +263,7 @@ describe('sw_get_receipt', () => {
     const harness = await harnessWith(fetchMock);
 
     const result = await harness.callTool('sw_get_receipt', {
-      id: 4644814211,
+      id: 3003,
       inline: true,
       output_dir: outputDir,
     });
@@ -285,7 +285,7 @@ describe('sw_get_receipt', () => {
     const harness = await harnessWith(fetchMock);
 
     const result = await harness.callTool('sw_get_receipt', {
-      id: 4644814211,
+      id: 3003,
       inline: true,
       output_dir: outputDir,
     });
@@ -294,7 +294,7 @@ describe('sw_get_receipt', () => {
     expect(result.content?.[1]).toMatchObject({
       type: 'resource',
       resource: {
-        uri: 'splitwise://expenses/4644814211/receipt',
+        uri: 'splitwise://expenses/3003/receipt',
         mimeType: 'application/pdf',
         blob: Buffer.from(PDF).toString('base64'),
       },
@@ -311,7 +311,7 @@ describe('sw_get_receipt', () => {
 
     const body = parseToolResult<{ text: string; path: string; bytes: number }>(
       await harness.callTool('sw_get_receipt', {
-        id: 4644814211,
+        id: 3003,
         extract_text: true,
         output_dir: outputDir,
       }),
@@ -336,7 +336,7 @@ describe('sw_get_receipt', () => {
 
     const body = parseToolResult<{ text?: string; text_note: string }>(
       await harness.callTool('sw_get_receipt', {
-        id: 4644814211,
+        id: 3003,
         extract_text: true,
         output_dir: outputDir,
       }),
@@ -356,7 +356,7 @@ describe('sw_get_receipt', () => {
 
     const body = parseToolResult<{ text?: string; text_note: string }>(
       await harness.callTool('sw_get_receipt', {
-        id: 4644814211,
+        id: 3003,
         extract_text: true,
         output_dir: outputDir,
       }),
@@ -376,7 +376,7 @@ describe('sw_get_receipt', () => {
 
     const body = parseToolResult<{ path?: string; inline: boolean }>(
       await harness.callTool('sw_get_receipt', {
-        id: 4644814211,
+        id: 3003,
         inline: true,
         write: false,
         output_dir: outputDir,
@@ -401,7 +401,7 @@ describe('sw_get_receipt', () => {
     const harness = await harnessWith(fetchMock);
 
     const result = await harness.callTool('sw_get_receipt', {
-      id: 4644814211,
+      id: 3003,
       inline: true,
       output_dir: join(outputDir, 'blocker', 'sub'),
     });
@@ -424,7 +424,7 @@ describe('sw_get_receipt', () => {
     const harness = await harnessWith(fetchMock);
 
     const result = await harness.callTool('sw_get_receipt', {
-      id: 4644814211,
+      id: 3003,
       output_dir: join(outputDir, 'blocker', 'sub'),
     });
 
@@ -446,14 +446,14 @@ describe('sw_get_receipt', () => {
 
     const body = parseToolResult<{ content_type: string; path: string; text: string }>(
       await harness.callTool('sw_get_receipt', {
-        id: 4644814211,
+        id: 3003,
         extract_text: true,
         output_dir: outputDir,
       }),
     );
 
     expect(body.content_type).toBe('application/pdf');
-    expect(basename(body.path)).toBe('splitwise-receipt-4644814211.pdf');
+    expect(basename(body.path)).toBe('splitwise-receipt-3003.pdf');
     expect(body.text).toContain('Total 129.00 USD');
 
     await harness.close();
@@ -468,11 +468,11 @@ describe('sw_get_receipt', () => {
     const harness = await harnessWith(fetchMock);
 
     const body = parseToolResult<{ content_type: string; path: string }>(
-      await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir }),
+      await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir }),
     );
 
     expect(body.content_type).toBe('image/heic');
-    expect(basename(body.path)).toBe('splitwise-receipt-4644814211.heic');
+    expect(basename(body.path)).toBe('splitwise-receipt-3003.heic');
 
     await harness.close();
   });
@@ -490,9 +490,9 @@ describe('sw_get_receipt', () => {
       .mockResolvedValueOnce(binaryResponse(unknown, contentType));
     const harness = await harnessWith(fetchMock);
     const body = parseToolResult<{ path: string }>(
-      await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir }),
+      await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir }),
     );
-    expect(basename(body.path)).toBe(`splitwise-receipt-4644814211.${ext}`);
+    expect(basename(body.path)).toBe(`splitwise-receipt-3003.${ext}`);
     await harness.close();
   });
 
@@ -506,7 +506,7 @@ describe('sw_get_receipt', () => {
     const harness = await harnessWith(fetchMock);
 
     const result = await harness.callTool('sw_get_receipt', {
-      id: 4644814211,
+      id: 3003,
       extract_text: true,
       output_dir: join(outputDir, 'blocker', 'sub'),
     });
@@ -532,7 +532,7 @@ describe('sw_get_receipt', () => {
     const harness = await harnessWith(fetchMock);
 
     const result = await harness.callTool('sw_get_receipt', {
-      id: 4644814211,
+      id: 3003,
       extract_text: true,
       inline: true,
       output_dir: join(outputDir, 'blocker', 'sub'),
@@ -562,7 +562,7 @@ describe('sw_get_receipt', () => {
     const harness = await harnessWith(fetchMock);
 
     const result = await harness.callTool('sw_get_receipt', {
-      id: 4644814211,
+      id: 3003,
       extract_text: true,
       inline: true,
       output_dir: outputDir,
@@ -583,7 +583,7 @@ describe('sw_get_receipt', () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(expenseResponse({ original: null, large: null }));
     const harness = await harnessWith(fetchMock);
 
-    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    const result = await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir });
 
     expect(result.isError).toBe(true);
     expect(errorText(result)).toContain('has no receipt attached');
@@ -599,7 +599,7 @@ describe('sw_get_receipt', () => {
       .mockResolvedValueOnce(new Response('<Error><Code>AccessDenied</Code></Error>', { status: 403 }));
     const harness = await harnessWith(fetchMock);
 
-    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    const result = await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir });
     const message = errorText(result);
 
     expect(result.isError).toBe(true);
@@ -618,7 +618,7 @@ describe('sw_get_receipt', () => {
       .mockResolvedValueOnce(binaryResponse(new Uint8Array(0), 'image/jpeg'));
     const harness = await harnessWith(fetchMock);
 
-    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    const result = await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir });
 
     expect(result.isError).toBe(true);
     expect(errorText(result)).toContain('empty receipt body');
@@ -637,7 +637,7 @@ describe('sw_get_receipt', () => {
     const harness = await harnessWith(fetchMock);
 
     const result = await harness.callTool('sw_get_receipt', {
-      id: 4644814211,
+      id: 3003,
       inline: true,
       output_dir: outputDir,
     });
@@ -650,7 +650,7 @@ describe('sw_get_receipt', () => {
     expect(body.inline_skipped).not.toContain('write:true');
     // The file is still written — only the base64 copy is dropped.
     expect(result.content).toHaveLength(1);
-    expect(readdirSync(outputDir)).toEqual(['splitwise-receipt-4644814211.jpg']);
+    expect(readdirSync(outputDir)).toEqual(['splitwise-receipt-3003.jpg']);
 
     await harness.close();
   });
@@ -668,7 +668,7 @@ describe('sw_get_receipt', () => {
       );
     const harness = await harnessWith(fetchMock);
 
-    const message = errorText(await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir }));
+    const message = errorText(await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir }));
 
     expect(message).not.toContain('SECRETSIG');
     expect(message).toContain('SignatureDoesNotMatch');
@@ -682,7 +682,7 @@ describe('sw_get_receipt', () => {
     );
     const harness = await harnessWith(fetchMock);
 
-    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    const result = await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir });
 
     expect(result.isError).toBe(true);
     expect(errorText(result)).toContain('https only');
@@ -717,7 +717,7 @@ describe('sw_get_receipt output_dir confinement', () => {
     const target = join(outside, 'escaped');
 
     const result = await harness.callTool('sw_get_receipt', {
-      id: 4644814211,
+      id: 3003,
       inline: true,
       output_dir: target,
     });
@@ -740,12 +740,12 @@ describe('sw_get_receipt output_dir confinement', () => {
     const harness = await harnessWith(receiptFetch());
     const target = join(outputDir, 'nested');
 
-    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: target });
+    const result = await harness.callTool('sw_get_receipt', { id: 3003, output_dir: target });
     const body = parseToolResult<{ path: string; write_error?: string }>(result);
 
     expect(result.isError).toBeFalsy();
     expect(body.write_error).toBeUndefined();
-    expect(readdirSync(target)).toEqual(['splitwise-receipt-4644814211.jpg']);
+    expect(readdirSync(target)).toEqual(['splitwise-receipt-3003.jpg']);
     expect(new Uint8Array(readFileSync(body.path))).toEqual(JPEG);
 
     await harness.close();
@@ -755,12 +755,12 @@ describe('sw_get_receipt output_dir confinement', () => {
     const harness = await harnessWith(receiptFetch());
     const target = join(outside, 'anywhere');
 
-    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: target });
+    const result = await harness.callTool('sw_get_receipt', { id: 3003, output_dir: target });
     const body = parseToolResult<{ path: string; write_error?: string }>(result);
 
     expect(result.isError).toBeFalsy();
     expect(body.write_error).toBeUndefined();
-    expect(readdirSync(target)).toEqual(['splitwise-receipt-4644814211.jpg']);
+    expect(readdirSync(target)).toEqual(['splitwise-receipt-3003.jpg']);
 
     await harness.close();
   });
@@ -783,7 +783,7 @@ describe('sw_get_receipt file-write defaults', () => {
       process.env.SPLITWISE_OUTPUT_DIR = outputDir;
       const harness = await harnessWith(fetchJpeg());
 
-      const result = await harness.callTool('sw_get_receipt', { id: 4644814211, ...args });
+      const result = await harness.callTool('sw_get_receipt', { id: 3003, ...args });
       // extract_text on a JPEG yields only a text_note, and with nothing else
       // returned the tool refuses — either way, nothing may be on disk.
       if (result.isError) expect(errorText(result)).toContain('only content was requested');
@@ -799,7 +799,7 @@ describe('sw_get_receipt file-write defaults', () => {
     const harness = await harnessWith(fetchJpeg());
 
     const body = parseToolResult<{ path: string }>(
-      await harness.callTool('sw_get_receipt', { id: 4644814211, inline: true, write: true }),
+      await harness.callTool('sw_get_receipt', { id: 3003, inline: true, write: true }),
     );
     expect(readdirSync(outputDir)).toEqual([basename(body.path)]);
 
@@ -810,7 +810,7 @@ describe('sw_get_receipt file-write defaults', () => {
     const harness = await harnessWith(fetchJpeg());
 
     const body = parseToolResult<{ path: string }>(
-      await harness.callTool('sw_get_receipt', { id: 4644814211 }),
+      await harness.callTool('sw_get_receipt', { id: 3003 }),
     );
     const defaultDir = join(fakeHome, 'Downloads', 'splitwise-mcp');
     expect(body.path.startsWith(defaultDir)).toBe(true);
@@ -824,7 +824,7 @@ describe('sw_get_receipt file-write defaults', () => {
     const harness = await harnessWith(fetchJpeg());
 
     const body = parseToolResult<{ path: string }>(
-      await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir }),
+      await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir }),
     );
     expect(statSync(body.path).mode & 0o777).toBe(0o600);
 
@@ -850,7 +850,7 @@ describe('sw_get_receipt download size cap', () => {
       .mockResolvedValueOnce(oversized);
     const harness = await harnessWith(fetchMock);
 
-    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    const result = await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir });
     expect(result.isError).toBe(true);
     expect(pulled).toBe(0);
     expect(JSON.stringify(result)).toMatch(/limit/);
@@ -870,7 +870,7 @@ describe('sw_get_receipt download size cap', () => {
       );
     const harness = await harnessWith(fetchMock);
 
-    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    const result = await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir });
     expect(result.isError).toBeFalsy();
     expect(readdirSync(outputDir)).toHaveLength(1);
 
@@ -885,7 +885,7 @@ describe('sw_get_receipt untrusted text', () => {
       .mockResolvedValueOnce(binaryResponse(TEXT_PDF, 'application/pdf'));
     const harness = await harnessWith(fetchMock);
 
-    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, extract_text: true });
+    const result = await harness.callTool('sw_get_receipt', { id: 3003, extract_text: true });
     const raw = errorText(result);
     expect(raw.startsWith('{"untrusted_content":true,"note":')).toBe(true);
     expect(parseToolResult<{ text: string }>(result).text).toContain('Total 129.00 USD');
@@ -902,7 +902,7 @@ describe('sw_get_receipt untrusted text', () => {
       .mockResolvedValueOnce(binaryResponse(JPEG, 'image/jpeg'));
     const harness = await harnessWith(fetchMock);
 
-    const result = await harness.callTool('sw_get_receipt', { id: 4644814211, output_dir: outputDir });
+    const result = await harness.callTool('sw_get_receipt', { id: 3003, output_dir: outputDir });
     expect(errorText(result).startsWith('{"expense_id"')).toBe(true);
 
     await harness.close();

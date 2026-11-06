@@ -18,7 +18,7 @@ describe('friend tools', () => {
 
   describe('sw_list_friends', () => {
     it('calls GET /get_friends and returns JSON', async () => {
-      const friendsData = { friends: [{ id: 7, first_name: 'Meredith' }] };
+      const friendsData = { friends: [{ id: 7, first_name: 'Sam' }] };
       mockRequest.mockResolvedValue(friendsData);
 
       const result = await harness.callTool('sw_list_friends');
@@ -27,7 +27,7 @@ describe('friend tools', () => {
       // Parsed, not substring-matched: the response is minified now, and
       // compact folds first_name/last_name into one `name`.
       const body = JSON.parse((result.content[0] as { text: string }).text);
-      expect(body.friends[0]).toMatchObject({ id: 7, name: 'Meredith' });
+      expect(body.friends[0]).toMatchObject({ id: 7, name: 'Sam' });
     });
   });
 

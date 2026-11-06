@@ -53,9 +53,9 @@ describe('equalSplit', () => {
 
 describe('resolveMember', () => {
   const members = [
-    { id: 1, first_name: 'Chris', last_name: 'Hall', email: 'c@example.com' },
-    { id: 2, first_name: 'Alison', last_name: 'Hall', email: 'a@example.com' },
-    { id: 3, first_name: 'Chris', last_name: 'Egan', email: 'e@example.com' },
+    { id: 1, first_name: 'Pat', last_name: 'Doe', email: 'c@example.com' },
+    { id: 2, first_name: 'Sam', last_name: 'Doe', email: 'a@example.com' },
+    { id: 3, first_name: 'Pat', last_name: 'Example', email: 'e@example.com' },
   ];
 
   it('accepts an id that is a member', () => {
@@ -63,16 +63,16 @@ describe('resolveMember', () => {
   });
 
   it('matches a full name or email case-insensitively', () => {
-    expect(resolveMember('alison hall', members, 'paid_by')).toBe(2);
+    expect(resolveMember('sam doe', members, 'paid_by')).toBe(2);
     expect(resolveMember('E@EXAMPLE.COM', members, 'paid_by')).toBe(3);
   });
 
   it('matches a unique first name', () => {
-    expect(resolveMember('alison', members, 'paid_by')).toBe(2);
+    expect(resolveMember('sam', members, 'paid_by')).toBe(2);
   });
 
   it('refuses an ambiguous name and lists the candidates', () => {
-    expect(() => resolveMember('chris', members, 'paid_by')).toThrow(/ambiguous.*Chris Hall.*Chris Egan/);
+    expect(() => resolveMember('pat', members, 'paid_by')).toThrow(/ambiguous.*Pat Doe.*Pat Example/);
   });
 
   it('refuses an id or name that is not in the group', () => {

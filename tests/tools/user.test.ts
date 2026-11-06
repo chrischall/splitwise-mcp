@@ -18,7 +18,7 @@ describe('user tools', () => {
 
   describe('sw_get_current_user', () => {
     it('calls GET /get_current_user and returns JSON', async () => {
-      const userData = { user: { id: 123, first_name: 'Chris' } };
+      const userData = { user: { id: 123, first_name: 'Pat' } };
       mockRequest.mockResolvedValue(userData);
 
       const result = await harness.callTool('sw_get_current_user');
@@ -43,20 +43,20 @@ describe('user tools', () => {
   describe('sw_update_user', () => {
     it('calls POST /update_user/99 with only provided fields', async () => {
       mockRequest.mockResolvedValue({ user: { id: 99 } });
-      await confirmedCall(harness, mockRequest, 'sw_update_user', { id: 99, first_name: 'Chris' });
-      expect(mockRequest).toHaveBeenCalledWith('POST', '/update_user/99', { first_name: 'Chris' });
+      await confirmedCall(harness, mockRequest, 'sw_update_user', { id: 99, first_name: 'Pat' });
+      expect(mockRequest).toHaveBeenCalledWith('POST', '/update_user/99', { first_name: 'Pat' });
     });
 
     it('sends all provided optional fields', async () => {
       mockRequest.mockResolvedValue({ user: {} });
       await confirmedCall(harness, mockRequest, 'sw_update_user', { id: 99,
-        first_name: 'Chris',
+        first_name: 'Pat',
         last_name: 'Smith',
         locale: 'en',
         default_currency: 'USD',
       });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/update_user/99', {
-        first_name: 'Chris',
+        first_name: 'Pat',
         last_name: 'Smith',
         locale: 'en',
         default_currency: 'USD',
@@ -77,12 +77,12 @@ describe('user tools', () => {
       mockRequest.mockResolvedValue({ user: {} });
       await confirmedCall(harness, mockRequest, 'sw_update_user', {
         id: 99,
-        first_name: 'Chris',
+        first_name: 'Pat',
         email: 'x@attacker.example',
         password: 'hunter2',
       });
       const [, , body] = mockRequest.mock.calls[0];
-      expect(body).toEqual({ first_name: 'Chris' });
+      expect(body).toEqual({ first_name: 'Pat' });
     });
 
     it('is annotated as a non-read-only write so hosts can prompt', async () => {

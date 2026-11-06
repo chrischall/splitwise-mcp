@@ -17,13 +17,13 @@ Ask Claude things like:
 - *"Add a $50 dinner expense to the vacation group"*
 - *"Split this hotel bill 60/40 with Sarah"*
 - *"Who's in the trip group?"*
-- *"Add Meredith to the household group"*
+- *"Add Sam to the household group"*
 - *"Show me recent expenses"*
 - *"Delete that duplicate expense"*
 - *"Download the receipt from that hotel expense"*
 - *"Add that Amazon order screenshot as the receipt on the water-jug expense"*
-- *"Log $250.01 camp, Alison paid, split 50/50"*
-- *"Find every 'egan' expense this year, including deleted ones, and why they were deleted"*
+- *"Log $250.01 camp, Sam paid, split 50/50"*
+- *"Find every 'example' expense this year, including deleted ones, and why they were deleted"*
 
 ## Requirements
 
