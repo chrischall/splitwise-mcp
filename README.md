@@ -193,7 +193,7 @@ To save calls on such a client: **`sw_confirm({confirmToken})`** finishes any pr
 | Tool | What it does |
 |------|-------------|
 | `sw_get_receipt` | Download an expense's receipt image/PDF with the server's credentials. Returns it inline (`inline`), as extracted PDF text (`extract_text`), and/or written to a file |
-| `sw_get_upload_url` | Hosted only: a short-lived signed URL to `curl -X PUT` a receipt file to, then pass `receipt: {upload_id, filename}` — no base64 through the conversation |
+| `sw_get_upload_url` | Hosted only: a short-lived signed URL to `curl -X PUT` a receipt file to, then pass `receipt: {upload_id, filename}` — no base64 through the conversation. The upload is deleted from the server once Splitwise has the receipt (`upload_deleted` in the reply); a failed write keeps it for a retry |
 
 ### Utilities
 

@@ -40,7 +40,7 @@ export const receiptSchema = z
     upload_id: z
       .string()
       .min(1)
-      .describe('The upload_id from sw_get_upload_url, after the file was PUT to its upload_url. The way to send a full-size file to the hosted server without base64.')
+      .describe('The upload_id from sw_get_upload_url, after the file was PUT to its upload_url. The way to send a full-size file to the hosted server without base64. Single use: the upload is deleted once Splitwise has the receipt (the reply says upload_deleted); a failed or declined write keeps it, so the same upload_id can be retried.')
       .optional(),
     filename: z.string().min(1).max(200).describe('Name to store the file under, e.g. "receipt.pdf".'),
     mime_type: z
@@ -62,6 +62,8 @@ export interface LoadedReceipt {
   mimeType: string;
   /** What the confirmation preview shows instead of the bytes. */
   summary: { filename: string; mime_type: string; bytes: number; sha256: string };
+  /** The blob-store key it was read from, when the source was `upload_id` — deleted once the write succeeds. */
+  uploadId?: string;
 }
 
 const tooBig = (size: number) =>
@@ -174,7 +176,7 @@ async function readUpload(uploadId: string, client: SplitwiseClient | undefined)
   } catch (err) {
     if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
       throw new Error(
-        `No upload found for receipt.upload_id ${uploadId} — the PUT may not have run, failed, or the upload expired. Get a fresh link with sw_get_upload_url and upload the file again.`,
+        `No upload found for receipt.upload_id ${uploadId} — the PUT may not have run, failed, the upload expired, or it was already used (an upload is deleted once its receipt is attached). Get a fresh link with sw_get_upload_url and upload the file again.`,
       );
     }
     if ((err as { kind?: string }).kind === 'too_large') {
@@ -231,7 +233,40 @@ export async function loadReceipt(input: ReceiptInput, client?: SplitwiseClient)
     filename,
     mimeType: type.mime,
     summary: { filename, mime_type: type.mime, bytes: bytes.length, sha256 },
+    ...(input.upload_id !== undefined ? { uploadId: input.upload_id } : {}),
   };
+}
+
+/** A delete is housekeeping after a write that already landed: never let it hold the reply for long. */
+const UPLOAD_DELETE_TIMEOUT_MS = 10_000;
+
+/** What a write that used an upload reports about removing it. */
+export type UploadRelease = { upload_deleted: true } | { upload_deleted: false; upload_delete_error: string };
+
+/**
+ * Delete the blob-store copy of a receipt Splitwise now holds. Call it only
+ * after the write SUCCEEDED (and the file was verified stored): the preview may
+ * still be declined, and a failed write must leave the upload_id retryable.
+ *
+ * Never throws. The expense is already written, so an error here would read as
+ * a failed write and invite a duplicate; a delete that fails is reported, and
+ * the store's retention prune reclaims the object. A 404 means it is already
+ * gone (e.g. two ops in one batch used the same upload), which is the goal.
+ * Not `BlobStore.consume`: the read happens in `plan` (before the gate) and
+ * the write in `execute`, possibly calls apart, so there is no one callback
+ * to wrap.
+ */
+export async function releaseUpload(receipt: LoadedReceipt): Promise<UploadRelease | Record<string, never>> {
+  if (receipt.uploadId === undefined) return {};
+  try {
+    const store = blobStoreFromEnv();
+    if (!store) throw new Error('no blob store is configured on this server');
+    await store.delete(receipt.uploadId, { timeoutMs: UPLOAD_DELETE_TIMEOUT_MS });
+    return { upload_deleted: true };
+  } catch (err) {
+    if ((err as { status?: number }).status === 404) return { upload_deleted: true };
+    return { upload_deleted: false, upload_delete_error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 /**
