@@ -1,6 +1,6 @@
 ---
 name: splitwise-mcp
-description: Access Splitwise expense and group data via MCP. Use when the user asks about Splitwise expenses, groups, friends, or balances, or wants to add, edit, or delete expenses. Triggers on phrases like "add that expense to Splitwise", "split this with the vacation group", "make sure Meredith is in that group", "what do I owe", or any request involving shared expenses or group management in Splitwise. Requires splitwise-mcp installed and the splitwise server registered (see Setup below).
+description: Access Splitwise expense and group data via MCP. Use when the user asks about Splitwise expenses, groups, friends, or balances, or wants to add, edit, or delete expenses. Triggers on phrases like "add that expense to Splitwise", "split this with the vacation group", "make sure Sam is in that group", "what do I owe", or any request involving shared expenses or group management in Splitwise. Requires splitwise-mcp installed and the splitwise server registered (see Setup below).
 ---
 
 # splitwise-mcp
@@ -214,8 +214,8 @@ sw_create_expense(group_id, "Dinner", "80.00", split_equally: true)
 
 **Add someone to a group:**
 ```
-sw_list_friends → find Meredith's user_id
-sw_get_group(id) → check if Meredith is already in members[]
+sw_list_friends → find Sam's user_id
+sw_get_group(id) → check if Sam is already in members[]
 sw_add_user_to_group(group_id, user_id) → if not
 ```
 
@@ -241,7 +241,7 @@ sw_attach_receipt(expense_id, receipt: { base64: "<png/jpeg/gif/pdf bytes>", fil
 
 **Log a 50/50 expense the other person paid:**
 ```
-sw_create_expense(group_id, "Egan camp", "250.01", split: "equal", paid_by: "Alison")
+sw_create_expense(group_id, "Example camp", "250.01", split: "equal", paid_by: "Sam")
 → preview: users split 125.01 / 125.00, inferred_category, possible_duplicates (check these!)
 ```
 
@@ -249,7 +249,7 @@ sw_create_expense(group_id, "Egan camp", "250.01", split: "equal", paid_by: "Ali
 ```
 sw_get_upload_url(filename: "camp.jpg", content_type: "image/jpeg") → curl the file up
 sw_batch(ops: [
-  { tool: "sw_create_expense", args: { group_id, description: "Egan camp", cost: "250.01", split: "equal", paid_by: "Alison" } },
+  { tool: "sw_create_expense", args: { group_id, description: "Example camp", cost: "250.01", split: "equal", paid_by: "Sam" } },
   { tool: "sw_create_comment", args: { content: "Paid by card" }, refs: { expense_id: "0.expense_id" } },
   { tool: "sw_attach_receipt", args: { receipt: { upload_id, filename: "camp.jpg" } }, refs: { expense_id: "0.expense_id" } }
 ])
@@ -265,7 +265,7 @@ sw_attach_receipt(expense_id, receipt: { upload_id, filename: "receipt.jpg" })
 
 **Reconcile a long history (incl. deleted entries and why):**
 ```
-sw_list_expenses(group_id, description_contains: "egan", view: "rows",
+sw_list_expenses(group_id, description_contains: "example", view: "rows",
                  dated_after: "2026-01-01", include_comments: true)
 → rows with deleted_at / deleted_by and inline comments; pass next_cursor for more
 sw_list_expenses(..., include_deleted: "only")  → just the deleted ones
@@ -276,7 +276,7 @@ sw_list_expenses(..., include_deleted: "only")  → just the deleted ones
 sw_list_expenses(...) → find expense ID
 sw_get_receipt(id, extract_text: true) → line items and totals as text
 sw_get_receipt(id, inline: true)       → the actual bytes, when you need to see it
-sw_get_receipt(id)                     → writes e.g. ~/Downloads/splitwise-mcp/splitwise-receipt-4644814211.pdf
+sw_get_receipt(id)                     → writes e.g. ~/Downloads/splitwise-mcp/splitwise-receipt-3003.pdf
 ```
 
 **Search and edit an expense:**

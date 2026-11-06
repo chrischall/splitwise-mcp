@@ -13,10 +13,10 @@ import { confirmedCall, createTestHarness, parseToolResult, writes } from '../he
 const mockRequest = vi.spyOn(client, 'request');
 const mockMultipart = vi.spyOn(client, 'requestMultipart');
 
-const ALISON = { id: 2, first_name: 'Alison', last_name: 'Hall' };
-const CHRIS = { id: 1, first_name: 'Chris', last_name: 'Hall' };
-const live = (id: number) => ({ id, description: 'Egan tuition', cost: '100.00', deleted_at: null, deleted_by: null, updated_at: '2026-10-01T00:00:00Z', updated_by: CHRIS });
-const deleted = (id: number) => ({ ...live(id), deleted_at: '2026-10-02T09:15:00Z', deleted_by: ALISON });
+const SAM = { id: 2, first_name: 'Sam', last_name: 'Doe' };
+const PAT = { id: 1, first_name: 'Pat', last_name: 'Doe' };
+const live = (id: number) => ({ id, description: 'Example tuition', cost: '100.00', deleted_at: null, deleted_by: null, updated_at: '2026-10-01T00:00:00Z', updated_by: PAT });
+const deleted = (id: number) => ({ ...live(id), deleted_at: '2026-10-02T09:15:00Z', deleted_by: SAM });
 
 /** Route GETs of /get_expense/{id} to `expense`, and every write to `writeResult`. */
 function route(expense: unknown, writeResult: unknown = { success: true }) {
@@ -62,7 +62,7 @@ describe('expense state', () => {
       expect(mockRequest).toHaveBeenLastCalledWith('GET', '/get_expense/42');
       expect(parseToolResult(result)).toMatchObject({
         success: true,
-        post_state: { id: 42, deleted_at: null, updated_by: 'Chris Hall' },
+        post_state: { id: 42, deleted_at: null, updated_by: 'Pat Doe' },
       });
     });
 
@@ -71,7 +71,7 @@ describe('expense state', () => {
       const { result } = await confirmedCall(harness, mockRequest, 'sw_undelete_expense', { id: 42 });
       expect(result.isError).toBe(true);
       expect(text(result)).toMatch(/still deleted/);
-      expect(text(result)).toContain('Alison Hall');
+      expect(text(result)).toContain('Sam Doe');
       expect(text(result)).toContain('2026-10-02T09:15:00Z');
       expect(text(result)).not.toMatch(/"success":true/);
     });
@@ -86,7 +86,7 @@ describe('expense state', () => {
       route(deleted(42));
       const result = await harness.callTool(tool, args);
       expect(result.isError).toBe(true);
-      expect(text(result)).toMatch(/expense 42 is deleted \(by Alison Hall at 2026-10-02T09:15:00Z\)/);
+      expect(text(result)).toMatch(/expense 42 is deleted \(by Sam Doe at 2026-10-02T09:15:00Z\)/);
       expect(text(result)).toContain('sw_undelete_expense');
       expect(writes(mockRequest)).toBe(0);
       expect(mockMultipart).not.toHaveBeenCalled();
@@ -108,7 +108,7 @@ describe('expense state', () => {
       });
       const { result } = await confirmedCall(harness, mockRequest, 'sw_create_comment', { expense_id: 42, content: 'hi' });
       expect(result.isError).toBe(true);
-      expect(text(result)).toMatch(/expense 42 is deleted \(by Alison Hall/);
+      expect(text(result)).toMatch(/expense 42 is deleted \(by Sam Doe/);
     });
 
     it('keeps the original 403 when the expense is not deleted', async () => {
@@ -124,13 +124,13 @@ describe('expense state', () => {
 
   describe('create and update return the post-state', () => {
     it('sw_update_expense lifts deleted_at / updated_by out of the response', async () => {
-      route(live(42), { expenses: [{ ...live(42), cost: '5.00', updated_by: ALISON }] });
+      route(live(42), { expenses: [{ ...live(42), cost: '5.00', updated_by: SAM }] });
       const { result } = await confirmedCall(harness, mockRequest, 'sw_update_expense', { expense_id: 42, cost: '5.00' });
-      expect(parseToolResult(result)).toMatchObject({ post_state: { id: 42, deleted_at: null, updated_by: 'Alison Hall' } });
+      expect(parseToolResult(result)).toMatchObject({ post_state: { id: 42, deleted_at: null, updated_by: 'Sam Doe' } });
     });
 
     it('sw_create_expense does the same for the new expense', async () => {
-      route(undefined, { expenses: [{ ...live(77), created_by: CHRIS }] });
+      route(undefined, { expenses: [{ ...live(77), created_by: PAT }] });
       const { result } = await confirmedCall(harness, mockRequest, 'sw_create_expense', { group_id: 0, description: 'x', cost: '1.00', split_equally: true });
       expect(parseToolResult(result)).toMatchObject({ post_state: { id: 77, deleted_at: null } });
     });

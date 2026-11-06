@@ -5,20 +5,20 @@ import { createTestHarness, parseToolResult } from '../helpers.js';
 
 // "sw_list_expenses is too heavy for reconciliation": a year of one group came
 // back as ~110K characters and was truncated, when all that was wanted was
-// every "egan" entry, deleted ones included.
+// every "example" entry, deleted ones included.
 
 const mockRequest = vi.spyOn(client, 'request');
 
-const ALISON = { id: 2, first_name: 'Alison', last_name: 'Hall' };
-const CHRIS = { id: 1, first_name: 'Chris', last_name: 'Hall' };
+const SAM = { id: 2, first_name: 'Sam', last_name: 'Doe' };
+const PAT = { id: 1, first_name: 'Pat', last_name: 'Doe' };
 
 function expense(id: number, over: Record<string, unknown> = {}) {
   return {
     id, group_id: 5, description: `Item ${id}`, cost: '10.00', currency_code: 'USD',
     date: `2026-01-${String((id % 28) + 1).padStart(2, '0')}T12:00:00Z`,
-    created_by: CHRIS, updated_by: CHRIS, deleted_at: null, deleted_by: null,
+    created_by: PAT, updated_by: PAT, deleted_at: null, deleted_by: null,
     category: { id: 18, name: 'General' }, comments_count: 0, receipt: { large: null, original: null },
-    users: [{ user: CHRIS, user_id: 1, paid_share: '10.00', owed_share: '5.00', net_balance: '5.00' }],
+    users: [{ user: PAT, user_id: 1, paid_share: '10.00', owed_share: '5.00', net_balance: '5.00' }],
     repayments: [],
     ...over,
   };
@@ -62,10 +62,10 @@ describe('sw_list_expenses filters', () => {
 
   it('description_contains matches case-insensitively, and scans past the first upstream page', async () => {
     const all = Array.from({ length: 450 }, (_, i) => expense(i + 1));
-    all[10] = expense(11, { description: 'EGAN camp' });
-    all[300] = expense(301, { description: 'egan tuition' });
+    all[10] = expense(11, { description: 'EXAMPLE camp' });
+    all[300] = expense(301, { description: 'example tuition' });
     upstream(all);
-    const out = await list({ group_id: 5, description_contains: 'Egan', view: 'rows' });
+    const out = await list({ group_id: 5, description_contains: 'Example', view: 'rows' });
     expect(out.expenses.map((e) => e.id)).toEqual([11, 301]);
     // Upstream is read 200 at a time, keeping the group filter.
     expect(mockRequest).toHaveBeenCalledWith('GET', '/get_expenses?group_id=5&limit=200&offset=0');
@@ -78,15 +78,15 @@ describe('sw_list_expenses filters', () => {
     [false, [1, 3]],
     ['only', [2]],
   ] as const)('include_deleted: %s', async (include_deleted, ids) => {
-    upstream([expense(1), expense(2, { deleted_at: '2026-02-01T00:00:00Z', deleted_by: ALISON }), expense(3)]);
+    upstream([expense(1), expense(2, { deleted_at: '2026-02-01T00:00:00Z', deleted_by: SAM }), expense(3)]);
     const out = await list({ include_deleted, view: 'rows' });
     expect(out.expenses.map((e) => e.id)).toEqual(ids);
   });
 
   it('created_by takes an id or a name', async () => {
-    upstream([expense(1), expense(2, { created_by: ALISON })]);
+    upstream([expense(1), expense(2, { created_by: SAM })]);
     expect((await list({ created_by: 2 })).expenses.map((e) => e.id)).toEqual([2]);
-    expect((await list({ created_by: 'chris hall' })).expenses.map((e) => e.id)).toEqual([1]);
+    expect((await list({ created_by: 'pat doe' })).expenses.map((e) => e.id)).toEqual([1]);
   });
 
   it('min_cost / max_cost bound the cost, inclusive', async () => {
@@ -101,20 +101,20 @@ describe('sw_list_expenses filters', () => {
   });
 
   it('view "rows" returns the minimal projection only', async () => {
-    upstream([expense(1, { deleted_at: '2026-02-01T00:00:00Z', deleted_by: ALISON, comments_count: 2 })]);
+    upstream([expense(1, { deleted_at: '2026-02-01T00:00:00Z', deleted_by: SAM, comments_count: 2 })]);
     const [row] = (await list({ view: 'rows' })).expenses;
     expect(Object.keys(row!).sort()).toEqual(
       ['category', 'comments_count', 'cost', 'created_by', 'currency_code', 'date', 'deleted_at', 'deleted_by', 'description', 'has_receipt', 'id'].sort(),
     );
-    expect(row).toMatchObject({ deleted_by: 'Alison Hall', has_receipt: false });
+    expect(row).toMatchObject({ deleted_by: 'Sam Doe', has_receipt: false });
   });
 
   it('pages with a cursor: limit matches per call, next_cursor resumes exactly after the last', async () => {
-    upstream(Array.from({ length: 30 }, (_, i) => expense(i + 1, { description: i % 2 ? 'egan' : 'other' })));
-    const first = await list({ description_contains: 'egan', limit: 4, view: 'rows' });
+    upstream(Array.from({ length: 30 }, (_, i) => expense(i + 1, { description: i % 2 ? 'example' : 'other' })));
+    const first = await list({ description_contains: 'example', limit: 4, view: 'rows' });
     expect(first.expenses.map((e) => e.id)).toEqual([2, 4, 6, 8]);
     expect(first.next_cursor).toEqual(expect.any(String));
-    const second = await list({ description_contains: 'egan', limit: 4, view: 'rows', cursor: first.next_cursor });
+    const second = await list({ description_contains: 'example', limit: 4, view: 'rows', cursor: first.next_cursor });
     expect(second.expenses.map((e) => e.id)).toEqual([10, 12, 14, 16]);
   });
 
@@ -136,12 +136,12 @@ describe('sw_list_expenses filters', () => {
 
   it('include_comments inlines comments for matched rows that have any', async () => {
     upstream(
-      [expense(1, { comments_count: 1, description: 'egan' }), expense(2, { description: 'egan' })],
-      { 1: [{ id: 9, content: 'deleted: duplicate of 3', comment_type: 'User', created_at: '2026-02-01T00:00:00Z', user: ALISON }] },
+      [expense(1, { comments_count: 1, description: 'example' }), expense(2, { description: 'example' })],
+      { 1: [{ id: 9, content: 'deleted: duplicate of 3', comment_type: 'User', created_at: '2026-02-01T00:00:00Z', user: SAM }] },
     );
-    const out = await list({ description_contains: 'egan', include_comments: true, view: 'rows' });
+    const out = await list({ description_contains: 'example', include_comments: true, view: 'rows' });
     expect(out.expenses[0]!.comments).toEqual([
-      { id: 9, author: 'Alison Hall', content: 'deleted: duplicate of 3', comment_type: 'User', created_at: '2026-02-01T00:00:00Z' },
+      { id: 9, author: 'Sam Doe', content: 'deleted: duplicate of 3', comment_type: 'User', created_at: '2026-02-01T00:00:00Z' },
     ]);
     expect(out.expenses[1]).not.toHaveProperty('comments');
     expect(mockRequest).toHaveBeenCalledWith('GET', '/get_comments?expense_id=1');

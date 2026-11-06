@@ -5,12 +5,12 @@ afterEach(() => vi.restoreAllMocks());
 
 /** The shape a live `GET /get_groups` actually returns (captured 2026-09-04). */
 const LIVE_GROUP = {
-  id: 64856400,
+  id: 1001,
   name: 'Household',
   created_at: '2024-01-01T00:00:00Z',
   updated_at: '2026-09-04T11:48:09Z',
   members: [{
-    id: 88065463, first_name: 'Chris', last_name: 'Hall',
+    id: 2001, first_name: 'Pat', last_name: 'Doe',
     picture: { small: 'https://s3/a.png', medium: 'https://s3/b.png', large: 'https://s3/c.png' },
     custom_picture: true, email: 'c@example.com', registration_status: 'confirmed',
     balance: [{ currency_code: 'USD', amount: '-6.25' }],
@@ -30,15 +30,15 @@ const LIVE_GROUP = {
 
 /** The shape a live `GET /get_friends` entry actually returns. */
 const LIVE_FRIEND = {
-  id: 88065463,
-  first_name: 'Alison',
-  last_name: 'Hall',
+  id: 2001,
+  first_name: 'Sam',
+  last_name: 'Doe',
   email: 'a@example.com',
   registration_status: 'confirmed',
   picture: { small: 'https://s3/a.png', medium: 'https://s3/b.png', large: 'https://s3/c.png' },
   custom_picture: false,
   balance: [{ currency_code: 'USD', amount: '-6.25' }],
-  groups: [{ group_id: 64856400, balance: [] }],
+  groups: [{ group_id: 1001, balance: [] }],
   updated_at: '2026-09-04T11:48:09Z',
 };
 
@@ -53,7 +53,7 @@ describe('compactPerson', () => {
 
   it('MERGES first_name + last_name into name, and does not keep either', () => {
     const out = compactPerson(LIVE_FRIEND);
-    expect(out.name).toBe('Alison Hall');
+    expect(out.name).toBe('Sam Doe');
     expect(out).not.toHaveProperty('first_name');
     expect(out).not.toHaveProperty('last_name');
   });
@@ -65,8 +65,8 @@ describe('compactPerson', () => {
   });
 
   it('keeps just one of the pair when that is all Splitwise sent', () => {
-    expect(compactPerson({ id: 1, first_name: 'Alison' }).name).toBe('Alison');
-    expect(compactPerson({ id: 1, last_name: 'Hall' }).name).toBe('Hall');
+    expect(compactPerson({ id: 1, first_name: 'Sam' }).name).toBe('Sam');
+    expect(compactPerson({ id: 1, last_name: 'Doe' }).name).toBe('Doe');
   });
 
   it('drops the picture URLs a model cannot see', () => {
@@ -116,12 +116,12 @@ describe('compactGroup', () => {
 
   it('keeps what a caller acts on: who is in it, what they owe, and how to invite', () => {
     expect(compactGroup(LIVE_GROUP)).toMatchObject({
-      id: 64856400,
+      id: 1001,
       name: 'Household',
       group_type: 'home',
       invite_link: 'https://www.splitwise.com/join/abc',
       members: [{
-        id: 88065463, name: 'Chris Hall', email: 'c@example.com',
+        id: 2001, name: 'Pat Doe', email: 'c@example.com',
         registration_status: 'confirmed',
         balance: [{ currency_code: 'USD', amount: '-6.25' }],
       }],
@@ -137,40 +137,40 @@ describe('compactGroup', () => {
 
 /** The shape a live `GET /get_expenses` actually returns (captured 2026-09-04). */
 const LIVE_EXPENSE = {
-  id: 4666326570, group_id: 64856400, expense_bundle_id: null,
-  description: 'Eriks new shoes',
+  id: 3001, group_id: 1001, expense_bundle_id: null,
+  description: 'Kids new shoes',
   repeats: false, repeat_interval: null, email_reminder: false, email_reminder_in_advance: -1,
   next_repeat: null, details: null, comments_count: 0, payment: false,
   creation_method: 'equal', transaction_method: 'offline', transaction_confirmed: false,
   transaction_id: null, transaction_status: null,
-  cost: '61.14', currency_code: 'USD',
-  repayments: [{ from: 88065463, to: 88065693, amount: '30.57' }],
+  cost: '60.00', currency_code: 'USD',
+  repayments: [{ from: 2001, to: 2002, amount: '30.00' }],
   date: '2026-09-02T22:37:44Z', created_at: '2026-09-02T22:38:05Z',
-  created_by: { id: 88065693, first_name: 'Alison', last_name: 'Hall', picture: { medium: 'https://s3/a.png' }, custom_picture: false },
-  updated_at: '2026-09-02T22:38:06Z', updated_by: { id: 88065693, first_name: 'Alison', last_name: 'Hall', picture: { medium: 'https://s3/a.png' } },
+  created_by: { id: 2002, first_name: 'Sam', last_name: 'Doe', picture: { medium: 'https://s3/a.png' }, custom_picture: false },
+  updated_at: '2026-09-02T22:38:06Z', updated_by: { id: 2002, first_name: 'Sam', last_name: 'Doe', picture: { medium: 'https://s3/a.png' } },
   deleted_at: null, deleted_by: null,
   category: { id: 41, name: 'Clothing' },
-  receipt: { large: 'https://www.splitwise.com/api/v4.0/expenses/4666326570/receipt?x=1.jpeg&size=large', original: 'https://www.splitwise.com/api/v4.0/expenses/4666326570/receipt?x=1.jpeg' },
+  receipt: { large: 'https://www.splitwise.com/api/v4.0/expenses/3001/receipt?x=1.jpeg&size=large', original: 'https://www.splitwise.com/api/v4.0/expenses/3001/receipt?x=1.jpeg' },
   users: [
-    { user: { id: 88065693, first_name: 'Alison', last_name: 'Hall', picture: { medium: 'https://s3/a.png' } }, user_id: 88065693, paid_share: '61.14', owed_share: '30.57', net_balance: '30.57' },
-    { user: { id: 88065463, first_name: 'Chris', last_name: 'Hall', picture: { medium: 'https://s3/b.jpg' } }, user_id: 88065463, paid_share: '0.0', owed_share: '30.57', net_balance: '-30.57' },
+    { user: { id: 2002, first_name: 'Sam', last_name: 'Doe', picture: { medium: 'https://s3/a.png' } }, user_id: 2002, paid_share: '60.00', owed_share: '30.00', net_balance: '30.00' },
+    { user: { id: 2001, first_name: 'Pat', last_name: 'Doe', picture: { medium: 'https://s3/b.jpg' } }, user_id: 2001, paid_share: '0.0', owed_share: '30.00', net_balance: '-30.00' },
   ],
 };
 
 describe('compactExpense', () => {
   it('keeps the share breakdown, which is the point of an expense', () => {
     expect(compactExpense(LIVE_EXPENSE).users).toEqual([
-      { id: 88065693, name: 'Alison Hall', paid_share: '61.14', owed_share: '30.57', net_balance: '30.57' },
-      { id: 88065463, name: 'Chris Hall', paid_share: '0.0', owed_share: '30.57', net_balance: '-30.57' },
+      { id: 2002, name: 'Sam Doe', paid_share: '60.00', owed_share: '30.00', net_balance: '30.00' },
+      { id: 2001, name: 'Pat Doe', paid_share: '0.0', owed_share: '30.00', net_balance: '-30.00' },
     ]);
   });
 
   it('keeps cost, currency, date, category and repayments', () => {
     expect(compactExpense(LIVE_EXPENSE)).toMatchObject({
-      id: 4666326570, group_id: 64856400, description: 'Eriks new shoes',
-      cost: '61.14', currency_code: 'USD', date: '2026-09-02T22:37:44Z',
-      category: 'Clothing', created_by: 'Alison Hall',
-      repayments: [{ from: 88065463, to: 88065693, amount: '30.57' }],
+      id: 3001, group_id: 1001, description: 'Kids new shoes',
+      cost: '60.00', currency_code: 'USD', date: '2026-09-02T22:37:44Z',
+      category: 'Clothing', created_by: 'Sam Doe',
+      repayments: [{ from: 2001, to: 2002, amount: '30.00' }],
     });
   });
 
@@ -194,10 +194,10 @@ describe('compactExpense', () => {
   });
 
   it('names who last updated it, and who deleted it when deleted', () => {
-    expect(compactExpense(LIVE_EXPENSE).updated_by).toBe('Alison Hall');
+    expect(compactExpense(LIVE_EXPENSE).updated_by).toBe('Sam Doe');
     expect(compactExpense(LIVE_EXPENSE)).not.toHaveProperty('deleted_by');
-    const deleted = { ...LIVE_EXPENSE, deleted_at: '2026-09-03T00:00:00Z', deleted_by: { id: 88065463, first_name: 'Chris', last_name: 'Hall' } };
-    expect(compactExpense(deleted)).toMatchObject({ deleted_at: '2026-09-03T00:00:00Z', deleted_by: 'Chris Hall' });
+    const deleted = { ...LIVE_EXPENSE, deleted_at: '2026-09-03T00:00:00Z', deleted_by: { id: 2001, first_name: 'Pat', last_name: 'Doe' } };
+    expect(compactExpense(deleted)).toMatchObject({ deleted_at: '2026-09-03T00:00:00Z', deleted_by: 'Pat Doe' });
   });
 
   it('surfaces deleted_at when set, so a deleted expense is not silently counted', () => {
@@ -209,15 +209,15 @@ describe('compactExpense', () => {
 describe('rowExpense', () => {
   it('is the reconciliation row: exactly these keys', () => {
     expect(rowExpense(LIVE_EXPENSE)).toEqual({
-      id: 4666326570, date: '2026-09-02T22:37:44Z', description: 'Eriks new shoes',
-      cost: '61.14', currency_code: 'USD', category: 'Clothing', created_by: 'Alison Hall',
+      id: 3001, date: '2026-09-02T22:37:44Z', description: 'Kids new shoes',
+      cost: '60.00', currency_code: 'USD', category: 'Clothing', created_by: 'Sam Doe',
       comments_count: 0, has_receipt: true,
     });
   });
 
   it('carries deleted_at and deleted_by on a deleted row', () => {
-    const deleted = { ...LIVE_EXPENSE, deleted_at: '2026-09-03T00:00:00Z', deleted_by: { first_name: 'Chris', last_name: 'Hall' } };
-    expect(rowExpense(deleted)).toMatchObject({ deleted_at: '2026-09-03T00:00:00Z', deleted_by: 'Chris Hall' });
+    const deleted = { ...LIVE_EXPENSE, deleted_at: '2026-09-03T00:00:00Z', deleted_by: { first_name: 'Pat', last_name: 'Doe' } };
+    expect(rowExpense(deleted)).toMatchObject({ deleted_at: '2026-09-03T00:00:00Z', deleted_by: 'Pat Doe' });
   });
 
   it('is offered as a third rung on the expense list only', () => {

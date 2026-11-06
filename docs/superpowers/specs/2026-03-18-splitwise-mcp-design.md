@@ -5,7 +5,7 @@
 
 ## Overview
 
-A TypeScript MCP server that exposes the Splitwise API to Claude. Primary use case: natural-language transaction and group management — "add that expense to the vacation group", "make sure Meredith and I are in that group".
+A TypeScript MCP server that exposes the Splitwise API to Claude. Primary use case: natural-language transaction and group management — "add that expense to the vacation group", "make sure Sam and I are in that group".
 
 ## Architecture
 
@@ -96,7 +96,7 @@ All tools return the raw Splitwise API response serialized as JSON text (`JSON.s
 - **`sw_remove_user_from_group`** — Remove a user from a group. Input: `group_id` (integer), `user_id` (integer). Returns API response as JSON text.
 
 #### `friends.ts`
-- **`sw_list_friends`** — List all friends with their `id`, `first_name`, `last_name`, `email`. Claude uses this to resolve names like "Meredith" to a `user_id` before calling `sw_add_user_to_group` or building a custom split.
+- **`sw_list_friends`** — List all friends with their `id`, `first_name`, `last_name`, `email`. Claude uses this to resolve names like "Sam" to a `user_id` before calling `sw_add_user_to_group` or building a custom split.
 
 #### `expenses.ts`
 - **`sw_list_expenses`** — List/search expenses. Query params passed through only when provided by caller (never send defaults): `group_id`, `friend_id`, `dated_after` (ISO 8601), `dated_before` (ISO 8601), `updated_after`, `updated_before`, `limit`, `offset`. API default for `limit` is 20 when omitted.
@@ -134,9 +134,9 @@ Typical "add expense to group" flow:
 1. Claude calls `sw_list_groups` → finds group ID for "vacation"
 2. Claude calls `sw_create_expense` with `group_id`, `description`, `cost`, `split_equally: true`
 
-Typical "make sure Meredith is in that group" flow:
-1. Claude calls `sw_list_friends` → finds Meredith's user ID
-2. Claude calls `sw_get_group` → checks if Meredith is already in `members[]`
+Typical "make sure Sam is in that group" flow:
+1. Claude calls `sw_list_friends` → finds Sam's user ID
+2. Claude calls `sw_get_group` → checks if Sam is already in `members[]`
 3. If not: Claude calls `sw_add_user_to_group` with `group_id` + `user_id`
 
 ## Error Handling

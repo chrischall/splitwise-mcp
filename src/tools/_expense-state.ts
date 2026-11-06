@@ -29,7 +29,7 @@ export function postState(expense: Dict): Dict {
   };
 }
 
-/** "by Alison Hall at 2026-10-02T09:15:00Z", from whatever of the two Splitwise reported. */
+/** "by Sam Doe at 2026-10-02T09:15:00Z", from whatever of the two Splitwise reported. */
 function deletedBy(expense: Dict): string {
   const who = nameOf(asDict(expense.deleted_by)) ?? 'unknown';
   return `by ${who} at ${String(expense.deleted_at)}`;

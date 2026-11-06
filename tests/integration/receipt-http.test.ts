@@ -138,14 +138,14 @@ describe('receipt upload over HTTP (mocked Splitwise endpoint)', () => {
   });
 
   it('attach: only the file goes over the wire — no cost, split or other field', async () => {
-    respond = () => stored(4644807844);
+    respond = () => stored(3002);
     const result = await confirmed('sw_attach_receipt', {
-      expense_id: 4644807844,
+      expense_id: 3002,
       receipt: { base64: b64(PDF), filename: 'AA_SJDIWS_receipt_2026-08-13.pdf' },
     });
     expect(result.isError).toBeFalsy();
     const req = captured[0];
-    expect(req.url).toBe('/api/v3.0/update_expense/4644807844');
+    expect(req.url).toBe('/api/v3.0/update_expense/3002');
     const form = await formOf(req);
     expect([...form.keys()]).toEqual(['receipt']);
     expect((form.get('receipt') as File).name).toBe('AA_SJDIWS_receipt_2026-08-13.pdf');

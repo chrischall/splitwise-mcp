@@ -128,11 +128,11 @@ const GATED: Array<{
   },
   {
     tool: 'sw_update_user',
-    args: { id: 99, first_name: 'Chris' },
+    args: { id: 99, first_name: 'Pat' },
     method: 'POST',
     path: '/update_user/99',
-    willSend: { first_name: 'Chris' },
-    write: ['POST', '/update_user/99', { first_name: 'Chris' }],
+    willSend: { first_name: 'Pat' },
+    write: ['POST', '/update_user/99', { first_name: 'Pat' }],
   },
   {
     tool: 'sw_create_comment',

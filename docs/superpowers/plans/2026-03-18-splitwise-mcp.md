@@ -393,7 +393,7 @@ describe('user tools', () => {
 
   describe('sw_get_current_user', () => {
     it('calls GET /get_current_user and returns JSON', async () => {
-      const userData = { user: { id: 123, first_name: 'Chris' } };
+      const userData = { user: { id: 123, first_name: 'Pat' } };
       mockClient.request = vi.fn().mockResolvedValue(userData);
 
       const result = await handleTool('sw_get_current_user', {}, mockClient);
@@ -547,21 +547,21 @@ describe('sw_add_user_to_group', () => {
     mockClient.request = vi.fn().mockResolvedValue({ success: true });
     await handleTool('sw_add_user_to_group', {
       group_id: 10,
-      first_name: 'Meredith',
-      last_name: 'Grey',
-      email: 'meredith@example.com',
+      first_name: 'Sam',
+      last_name: 'Doe',
+      email: 'sam@example.com',
     }, mockClient);
     expect(mockClient.request).toHaveBeenCalledWith('POST', '/add_user_to_group', {
       group_id: 10,
-      first_name: 'Meredith',
-      last_name: 'Grey',
-      email: 'meredith@example.com',
+      first_name: 'Sam',
+      last_name: 'Doe',
+      email: 'sam@example.com',
     });
   });
 
   it('throws if user_id absent and name/email fields missing', async () => {
     await expect(
-      handleTool('sw_add_user_to_group', { group_id: 10, first_name: 'Meredith' }, mockClient)
+      handleTool('sw_add_user_to_group', { group_id: 10, first_name: 'Sam' }, mockClient)
     ).rejects.toThrow('first_name, last_name, and email are required when user_id is not provided');
   });
 });
@@ -759,13 +759,13 @@ describe('sw_list_friends', () => {
   });
 
   it('calls GET /get_friends and returns JSON', async () => {
-    const friendsData = { friends: [{ id: 7, first_name: 'Meredith' }] };
+    const friendsData = { friends: [{ id: 7, first_name: 'Sam' }] };
     mockClient.request = vi.fn().mockResolvedValue(friendsData);
 
     const result = await handleTool('sw_list_friends', {}, mockClient);
 
     expect(mockClient.request).toHaveBeenCalledWith('GET', '/get_friends');
-    expect(result.content[0].text).toContain('"first_name": "Meredith"');
+    expect(result.content[0].text).toContain('"first_name": "Sam"');
   });
 });
 ```

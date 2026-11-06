@@ -76,22 +76,22 @@ describe('group tools', () => {
     it('sends {group_id, first_name, last_name, email} when user_id is absent', async () => {
       mockRequest.mockResolvedValue({ success: true });
       await confirmedCall(harness, mockRequest, 'sw_add_user_to_group', { group_id: 10,
-        first_name: 'Meredith',
-        last_name: 'Grey',
-        email: 'meredith@example.com',
+        first_name: 'Sam',
+        last_name: 'Doe',
+        email: 'sam@example.com',
       });
       expect(mockRequest).toHaveBeenCalledWith('POST', '/add_user_to_group', {
         group_id: 10,
-        first_name: 'Meredith',
-        last_name: 'Grey',
-        email: 'meredith@example.com',
+        first_name: 'Sam',
+        last_name: 'Doe',
+        email: 'sam@example.com',
       });
     });
 
     it('throws if user_id absent and name/email fields missing', async () => {
       // The guard runs before the confirmation gate, so it refuses on the first
       // call and still refuses when a confirmToken is supplied.
-      const args = { group_id: 10, first_name: 'Meredith' };
+      const args = { group_id: 10, first_name: 'Sam' };
       for (const call of [args, { ...args, confirmToken: 'any-token' }]) {
         const result = await harness.callTool('sw_add_user_to_group', call);
         expect(result.isError).toBe(true);
