@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import { registerExpenseTools } from '../../src/tools/expenses.js';
 import { registerUtilityTools } from '../../src/tools/utilities.js';
 import { registerBatchTools } from '../../src/tools/batch.js';
@@ -10,6 +10,7 @@ import { createTestHarness, parseToolResult, writes } from '../helpers.js';
 
 const mockRequest = vi.spyOn(client, 'request');
 const mockMultipart = vi.spyOn(client, 'requestMultipart');
+const mockAsset = vi.spyOn(client, 'fetchAsset');
 
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 5, 5, 5]);
 const b64 = Buffer.from(PNG).toString('base64');
@@ -39,6 +40,7 @@ afterAll(async () => {
   if (harness) await harness.close();
   mockRequest.mockRestore();
   mockMultipart.mockRestore();
+  mockAsset.mockRestore();
 });
 
 describe('sw_confirm and sw_batch', () => {
@@ -100,6 +102,55 @@ describe('sw_confirm and sw_batch', () => {
     expect(body).toMatchObject({ status: 'partial', not_run: [2] });
     expect(body.results[1]).toMatchObject({ applied: false, error: expect.stringContaining('comment too long') });
     expect(mockMultipart).not.toHaveBeenCalled();
+  });
+
+  describe('with a receipt uploaded through sw_get_upload_url', () => {
+    const ID = 'up/1b4e28ba-2fa1-11d2-883f-0016d3cca427/r.png';
+    const receiptOp = { tool: 'sw_attach_receipt', args: { receipt: { upload_id: ID, filename: 'r.png' } }, refs: { expense_id: '0.expense_id' } };
+    let blobFetch: ReturnType<typeof vi.fn>;
+    const deletes = () => blobFetch.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'DELETE');
+
+    beforeEach(() => {
+      vi.stubEnv('MCP_BLOB_BASE_URL', 'https://mcp.test/b/reg_abc123');
+      vi.stubEnv('MCP_BLOB_SIGNING_KEY', 'derived-signing-key');
+      blobFetch = vi.fn(async () => new Response(null, { status: 204 }));
+      vi.stubGlobal('fetch', blobFetch);
+      mockAsset.mockReset();
+      mockAsset.mockResolvedValue({ status: 200, contentType: 'image/png', headers: new Headers(), bytes: PNG });
+    });
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+    });
+
+    it('the batch preview deletes nothing; the approved batch deletes the upload once the receipt is stored', async () => {
+      const ops = [
+        { tool: 'sw_create_expense', args: { group_id: 0, description: 'Placeholder item', cost: '10.00', split_equally: true } },
+        receiptOp,
+      ];
+      const phase1 = parseToolResult<Phase1>(await harness.callTool('sw_batch', { ops }));
+      expect(phase1.status).toBe('confirmation-required');
+      expect(blobFetch).not.toHaveBeenCalled();
+
+      const result = await harness.callTool('sw_confirm', { confirmToken: phase1.confirmToken });
+      expect(result.isError).toBeFalsy();
+      expect(deletes()).toHaveLength(1);
+      expect(String(deletes()[0]![0])).toContain(`/${ID}?`);
+      expect(JSON.stringify(parseToolResult<BatchResult>(result).results[1])).toContain('"upload_deleted":true');
+    });
+
+    it('a batch that stops before the receipt op keeps the upload for a retry', async () => {
+      failComment = true;
+      const ops = [
+        { tool: 'sw_create_expense', args: { group_id: 0, description: 'x', cost: '1.00', split_equally: true } },
+        { tool: 'sw_create_comment', args: { content: 'y' }, refs: { expense_id: '0.expense_id' } },
+        receiptOp,
+      ];
+      const { confirmToken } = parseToolResult<Phase1>(await harness.callTool('sw_batch', { ops }));
+      const result = await harness.callTool('sw_confirm', { confirmToken });
+      expect(result.isError).toBe(true);
+      expect(deletes()).toHaveLength(0);
+    });
   });
 
   it('sw_batch refuses tools that are not batchable writes', async () => {

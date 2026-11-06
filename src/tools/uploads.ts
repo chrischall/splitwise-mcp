@@ -23,7 +23,7 @@ export function registerUploadTools(server: McpServer, _client: SplitwiseClient)
     'sw_get_upload_url',
     {
       description:
-        'Get a short-lived (~10 min) signed URL to upload a receipt file (PNG, JPEG, GIF or PDF, up to 10 MiB) to this server WITHOUT putting its bytes in a tool call: run the returned curl command from a shell or sandbox that has the file and network access to the URL\'s host, then pass receipt: {upload_id, filename} to sw_attach_receipt, sw_create_expense or sw_update_expense. Send the original file — no need to shrink it. Only on the hosted server; locally use receipt.path. If you have no shell that can reach the URL, use receipt.base64 instead.',
+        'Get a short-lived (~10 min) signed URL to upload a receipt file (PNG, JPEG, GIF or PDF, up to 10 MiB) to this server WITHOUT putting its bytes in a tool call: run the returned curl command from a shell or sandbox that has the file and network access to the URL\'s host, then pass receipt: {upload_id, filename} to sw_attach_receipt, sw_create_expense or sw_update_expense. Send the original file — no need to shrink it. The upload is deleted from this server once the receipt is attached (a failed write keeps it for a retry), so each upload_id is used once. Only on the hosted server; locally use receipt.path. If you have no shell that can reach the URL, use receipt.base64 instead.',
       annotations: { readOnlyHint: true, openWorldHint: true },
       _meta: moneyMeta('other'),
       inputSchema: z.object({

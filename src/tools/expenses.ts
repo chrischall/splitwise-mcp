@@ -16,6 +16,7 @@ import {
   loadReceipt,
   receiptParam,
   receiptSchema,
+  releaseUpload,
   verifyReceiptStored,
   type LoadedReceipt,
 } from './_receipt.js';
@@ -125,7 +126,10 @@ function buildExpenseBody(args: Record<string, unknown>): Record<string, unknown
  * Send a create/update. With a receipt the whole expense goes as multipart
  * (Splitwise only takes a file that way) and the response must show the file
  * stored; without one it stays JSON and the response passes through, exactly
- * as before.
+ * as before. A receipt that came from `upload_id` is deleted from the blob
+ * store once Splitwise has it (`upload_deleted`), here in `execute` — so a
+ * direct call, `sw_confirm` and `sw_batch` all clean up, and the preview never
+ * does.
  */
 async function sendExpenseWrite(
   client: SplitwiseClient,
@@ -136,7 +140,9 @@ async function sendExpenseWrite(
 ): Promise<unknown> {
   if (!receipt) return client.request('POST', path, body);
   const data = await client.requestMultipart('POST', path, buildReceiptForm(body, receipt));
-  return verifyReceiptStored(data, expenseId);
+  // Only past verification: a dropped file keeps the upload for sw_attach_receipt.
+  const stored = verifyReceiptStored(data, expenseId);
+  return { ...stored, ...(await releaseUpload(receipt)) };
 }
 
 /** The body the confirmation preview shows: the fields, plus the file's identity in place of its bytes. */
@@ -442,7 +448,7 @@ export function registerExpenseTools(server: McpServer, client: SplitwiseClient)
   withToolMeta(server, moneyMeta('change'), () => registerWrite(server, defineWrite({
     name: 'sw_attach_receipt',
     description:
-      'Attach (or replace) the receipt image or PDF on an existing Splitwise expense. Changes nothing else on the expense — cost, split and description are not sent. Pass the file as receipt.upload_id (hosted: upload it first via sw_get_upload_url — no bytes in the tool call), receipt.path (local) or receipt.base64. Fails if Splitwise does not store the file.',
+      'Attach (or replace) the receipt image or PDF on an existing Splitwise expense. Changes nothing else on the expense — cost, split and description are not sent. Pass the file as receipt.upload_id (hosted: upload it first via sw_get_upload_url — no bytes in the tool call), receipt.path (local) or receipt.base64. Fails if Splitwise does not store the file. An upload_id is deleted from the upload store once the file is stored (upload_deleted in the reply).',
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
     inputSchema: z.object({
       expense_id: z.number().describe('ID of the expense to attach the receipt to'),

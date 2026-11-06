@@ -155,3 +155,157 @@ describe('receipt.upload_id', () => {
     expect(new Uint8Array(await (form.get('receipt') as File).arrayBuffer())).toEqual(PNG);
   });
 });
+
+// An uploaded receipt is financial and personal. Once Splitwise has stored it
+// the copy in the blob store has no further use, so the write deletes it —
+// but only a write that SUCCEEDED: a preview may still be declined, and a
+// failed write must leave the same upload_id usable for a retry.
+describe('an upload is deleted once Splitwise has it', () => {
+  const ID = 'up/1b4e28ba-2fa1-11d2-883f-0016d3cca427/r.png';
+  const stored = { expenses: [{ id: 42, receipt: { original: 'https://s3/o.png' } }] };
+  let deleteStatus = 204;
+  let blobFetch: ReturnType<typeof vi.fn>;
+
+  const deletes = () =>
+    blobFetch.mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'DELETE');
+
+  beforeEach(() => {
+    deleteStatus = 204;
+    blobFetch = vi.fn(async () => new Response(null, { status: deleteStatus }));
+    vi.stubGlobal('fetch', blobFetch);
+    mockAsset.mockResolvedValue({ status: 200, contentType: 'image/png', headers: new Headers(), bytes: PNG });
+    mockRequest.mockImplementation(async (method: string) => (method === 'GET' ? {} : stored) as never);
+    mockMultipart.mockResolvedValue(stored as never);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const attach = (extra: Record<string, unknown> = {}) =>
+    harness.callTool('sw_attach_receipt', { expense_id: 42, receipt: { upload_id: ID, filename: 'r.png' }, ...extra });
+
+  it('the preview deletes nothing; the confirmed write deletes the upload with a signed DELETE', async () => {
+    const phase1 = parseToolResult<{ confirmToken: string }>(await attach());
+    expect(mockMultipart).not.toHaveBeenCalled();
+    expect(blobFetch).not.toHaveBeenCalled();
+
+    const result = await attach({ confirmToken: phase1.confirmToken });
+    expect(result.isError).toBeFalsy();
+    expect(deletes()).toHaveLength(1);
+    const url = new URL(String(deletes()[0]![0]));
+    expect(`${url.origin}${url.pathname}`).toBe(`${BASE}/${ID}`);
+    expect(url.searchParams.get('sig')).toBe(hmac(`del\0reg_abc123/${ID}\0${url.searchParams.get('exp')}`));
+    const body = parseToolResult<Record<string, unknown>>(result);
+    expect(body).toMatchObject({ receipt_attached: true, upload_deleted: true });
+    expect(body).not.toHaveProperty('upload_delete_error');
+  });
+
+  it('a declined preview leaves the upload in place (no write, no delete)', async () => {
+    await attach();
+    await attach();
+    expect(blobFetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['sw_create_expense', { group_id: 0, description: 'Placeholder item', cost: '10.00', split_equally: true }],
+    ['sw_update_expense', { expense_id: 42 }],
+  ])('%s deletes the upload after a successful write', async (tool, args) => {
+    const { result } = await confirmedCall(harness, mockMultipart, tool, { ...args, receipt: { upload_id: ID, filename: 'r.png' } });
+    expect(result.isError).toBeFalsy();
+    expect(deletes()).toHaveLength(1);
+    expect(parseToolResult<Record<string, unknown>>(result).upload_deleted).toBe(true);
+  });
+
+  it('a failed write keeps the upload, so the same upload_id can be retried', async () => {
+    mockMultipart.mockRejectedValueOnce(new Error('Splitwise is unavailable'));
+    const { result: failed } = await confirmedCall(harness, mockMultipart, 'sw_attach_receipt', {
+      expense_id: 42,
+      receipt: { upload_id: ID, filename: 'r.png' },
+    });
+    expect(failed.isError).toBe(true);
+    expect(deletes()).toHaveLength(0);
+
+    const { result: retried } = await confirmedCall(harness, mockMultipart, 'sw_attach_receipt', {
+      expense_id: 42,
+      receipt: { upload_id: ID, filename: 'r.png' },
+    });
+    expect(retried.isError).toBeFalsy();
+    expect(deletes()).toHaveLength(1);
+  });
+
+  it('keeps the upload when Splitwise answers 200 but drops the file', async () => {
+    mockMultipart.mockResolvedValue({ expenses: [{ id: 42, receipt: { original: null } }] } as never);
+    const { result } = await confirmedCall(harness, mockMultipart, 'sw_attach_receipt', {
+      expense_id: 42,
+      receipt: { upload_id: ID, filename: 'r.png' },
+    });
+    expect(result.isError).toBe(true);
+    expect(deletes()).toHaveLength(0);
+  });
+
+  it('reports a failed delete instead of throwing — the receipt is already attached', async () => {
+    deleteStatus = 500;
+    const { result } = await confirmedCall(harness, mockMultipart, 'sw_attach_receipt', {
+      expense_id: 42,
+      receipt: { upload_id: ID, filename: 'r.png' },
+    });
+    expect(result.isError).toBeFalsy();
+    const body = parseToolResult<Record<string, unknown>>(result);
+    expect(body).toMatchObject({ receipt_attached: true, upload_deleted: false });
+    expect(String(body.upload_delete_error)).toMatch(/HTTP 500/);
+    expect(String(body.upload_delete_error)).not.toMatch(/sig=/);
+  });
+
+  it('reports a delete that cannot reach the store, without the signed URL', async () => {
+    blobFetch.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') throw new TypeError(`fetch failed: ${_url}`);
+      return new Response(null, { status: 204 });
+    });
+    const { result } = await confirmedCall(harness, mockMultipart, 'sw_attach_receipt', {
+      expense_id: 42,
+      receipt: { upload_id: ID, filename: 'r.png' },
+    });
+    expect(result.isError).toBeFalsy();
+    const body = parseToolResult<Record<string, unknown>>(result);
+    expect(body.upload_deleted).toBe(false);
+    expect(String(body.upload_delete_error)).not.toMatch(/sig=/);
+  });
+
+  it('an upload already gone (404 on delete) counts as deleted', async () => {
+    deleteStatus = 404;
+    const { result } = await confirmedCall(harness, mockMultipart, 'sw_attach_receipt', {
+      expense_id: 42,
+      receipt: { upload_id: ID, filename: 'r.png' },
+    });
+    expect(parseToolResult<Record<string, unknown>>(result)).toMatchObject({ upload_deleted: true });
+  });
+
+  it('a base64 receipt has no upload to delete and says nothing about one', async () => {
+    const { result } = await confirmedCall(harness, mockMultipart, 'sw_attach_receipt', {
+      expense_id: 42,
+      receipt: { base64: Buffer.from(PNG).toString('base64'), filename: 'r.png' },
+    });
+    expect(result.isError).toBeFalsy();
+    expect(blobFetch).not.toHaveBeenCalled();
+    expect(parseToolResult<Record<string, unknown>>(result)).not.toHaveProperty('upload_deleted');
+  });
+
+  it('a reused upload_id that was already consumed says so', async () => {
+    const { ApiError } = await import('@chrischall/mcp-utils');
+    mockAsset.mockRejectedValue(new ApiError(404, 'not found'));
+    await expect(loadReceipt({ upload_id: ID, filename: 'r.png' }, client)).rejects.toThrow(/already (used|attached)/);
+  });
+});
+
+describe('releasing an upload when the store has gone away', () => {
+  it('reports rather than throws when no blob store is configured at write time', async () => {
+    const { releaseUpload } = await import('../../src/tools/_receipt.js');
+    vi.stubEnv('MCP_BLOB_BASE_URL', '');
+    const out = await releaseUpload({
+      bytes: PNG,
+      filename: 'r.png',
+      mimeType: 'image/png',
+      summary: { filename: 'r.png', mime_type: 'image/png', bytes: PNG.length, sha256: '0' },
+      uploadId: 'up/1b4e28ba-2fa1-11d2-883f-0016d3cca427/r.png',
+    });
+    expect(out).toEqual({ upload_deleted: false, upload_delete_error: expect.stringMatching(/no blob store/) });
+  });
+});
