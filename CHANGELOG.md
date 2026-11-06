@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.7.0](https://github.com/chrischall/splitwise-mcp/compare/v3.6.0...v3.7.0) (2026-11-06)
+
+
+### Features
+
+* **receipts:** delete an uploaded receipt once Splitwise has it ([#272](https://github.com/chrischall/splitwise-mcp/issues/272)) ([f76d410](https://github.com/chrischall/splitwise-mcp/commit/f76d410c36520d8c41ff986e0669c2827cd79847))
+
 ## [3.6.0](https://github.com/chrischall/splitwise-mcp/compare/v3.5.1...v3.6.0) (2026-11-04)
 
 
