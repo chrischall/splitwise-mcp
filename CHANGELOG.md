@@ -1,5 +1,17 @@
 # Changelog
 
+## [3.7.1](https://github.com/chrischall/splitwise-mcp/compare/v3.7.0...v3.7.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **deps:** upgrade @chrischall/mcp-utils to 3.7.2 so uploads carry only the file's bytes ([#276](https://github.com/chrischall/splitwise-mcp/issues/276)) ([fb48d5a](https://github.com/chrischall/splitwise-mcp/commit/fb48d5abcc2ebdce7b6390ca13dc156f8f3ddb98))
+
+
+### Documentation
+
+* replace real names in fixtures, docs and skill with placeholders ([#274](https://github.com/chrischall/splitwise-mcp/issues/274)) ([f5cc0c7](https://github.com/chrischall/splitwise-mcp/commit/f5cc0c7376c522c115d0add8f9838040430569d9))
+
 ## [3.7.0](https://github.com/chrischall/splitwise-mcp/compare/v3.6.0...v3.7.0) (2026-11-06)
 
 
