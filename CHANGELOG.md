@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.7.2](https://github.com/chrischall/splitwise-mcp/compare/v3.7.1...v3.7.2) (2026-11-08)
+
+
+### Bug Fixes
+
+* **deps:** bump unpdf from 2.0.0 to 2.1.0 in the production-dependencies group ([#278](https://github.com/chrischall/splitwise-mcp/issues/278)) ([3c3ee4e](https://github.com/chrischall/splitwise-mcp/commit/3c3ee4ea62717e462f22323b577d4bbf09713805))
+
 ## [3.7.1](https://github.com/chrischall/splitwise-mcp/compare/v3.7.0...v3.7.1) (2026-11-07)
 
 
